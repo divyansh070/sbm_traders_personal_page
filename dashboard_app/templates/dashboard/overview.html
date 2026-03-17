@@ -1,0 +1,80 @@
+{% extends 'dashboard/base.html' %}
+
+{% block title %}Dashboard Overview - SBM Traders{% endblock %}
+
+{% block content %}
+<div class="row mb-5">
+    <div class="col-md-12">
+        <h1 class="fw-bold">Welcome back, Admin</h1>
+        <p class="text-secondary">Here's what's happening with SBM Traders today.</p>
+    </div>
+</div>
+
+<div class="row g-4 mb-5">
+    <div class="col-md-4">
+        <div class="card metric-card">
+            <div class="metric-label">Total Payment Received</div>
+            <div class="metric-value">₹{{ total_amount|floatformat:2 }}</div>
+        </div>
+    </div>
+    <div class="col-md-4">
+        <div class="card metric-card">
+            <div class="metric-label">Total Outstanding Amount</div>
+            <div class="metric-value">₹{{ total_unused|floatformat:2 }}</div>
+        </div>
+    </div>
+    <div class="col-md-4">
+        <div class="card metric-card">
+            <div class="metric-label">Avg Delay (Late Payments)</div>
+            <div class="metric-value">{{ avg_delay|floatformat:1 }} Days</div>
+        </div>
+    </div>
+</div>
+
+<div class="row">
+    <div class="col-md-8">
+        <div class="glass-panel">
+            <div class="d-flex justify-content-between align-items-center mb-4">
+                <h3 class="m-0">🏆 Top 10 Customers</h3>
+                <a href="{% url 'dashboard:customer_list' %}" class="btn btn-sm btn-outline-info">View All</a>
+            </div>
+            <div class="table-responsive">
+                <table class="table">
+                    <thead>
+                        <tr>
+                            <th>Customer Name</th>
+                            <th class="text-end">Total Amount</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for customer in top_customers %}
+                        <tr>
+                            <td>
+                                <a href="{% url 'dashboard:customer_detail' customer.id %}">{{ customer.name }}</a>
+                            </td>
+                            <td class="text-end">₹{{ customer.total_payment|floatformat:2 }}</td>
+                        </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    </div>
+    <div class="col-md-4">
+        <div class="card p-4 h-100">
+            <h4>Quick Actions</h4>
+            <div class="list-group list-group-flush mt-3">
+                <a href="#" class="list-group-item list-group-item-action bg-transparent text-light border-color">
+                    📥 Download Report
+                </a>
+                <a href="#" class="list-group-item list-group-item-action bg-transparent text-light border-color">
+                    📧 Send Payment Reminders
+                </a>
+                <a href="#" class="list-group-item list-group-item-action bg-transparent text-light border-color">
+                    ⚙️ Settings
+                </a>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
