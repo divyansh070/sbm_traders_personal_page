@@ -64,6 +64,20 @@
         <div class="card p-4 h-100">
             <h4>Quick Actions</h4>
             <div class="list-group list-group-flush mt-3">
+                <form method="post" action="{% url 'dashboard:sync_database' %}" id="syncForm" enctype="multipart/form-data">
+                    {% csrf_token %}
+                    <div class="px-3 py-2 border-bottom border-secondary">
+                        <label for="excelFile" class="form-label text-light small mb-1">Select Excel Data (.xlsx)</label>
+                        <input type="file" class="form-control form-control-sm bg-dark text-light border-secondary" id="excelFile" name="excel_file" accept=".xlsx" required>
+                    </div>
+                    <button type="submit" id="syncBtn" class="list-group-item list-group-item-action bg-transparent text-light border-color d-flex align-items-center gap-2" style="border: none; cursor: pointer; width: 100%; text-align: left;">
+                        <span id="syncIcon">📤</span>
+                        <span id="syncText">Upload & Sync Database</span>
+                        <div id="syncSpinner" class="spinner-border spinner-border-sm text-info ms-auto" role="status" style="display: none;">
+                            <span class="visually-hidden">Loading...</span>
+                        </div>
+                    </button>
+                </form>
                 <a href="#" class="list-group-item list-group-item-action bg-transparent text-light border-color">
                     📥 Download Report
                 </a>
@@ -77,4 +91,46 @@
         </div>
     </div>
 </div>
+
+{% if messages %}
+<div class="position-fixed top-0 end-0 p-3" style="z-index: 1100;">
+    {% for message in messages %}
+    <div class="toast show align-items-center text-bg-{{ message.tags }} border-0 mb-2" role="alert" aria-live="assertive" aria-atomic="true">
+        <div class="d-flex">
+            <div class="toast-body">
+                {% if message.tags == 'success' %}✅{% elif message.tags == 'error' %}❌{% endif %}
+                {{ message }}
+            </div>
+            <button type="button" class="btn-close btn-close-white me-2 m-auto" data-bs-dismiss="toast" aria-label="Close"></button>
+        </div>
+    </div>
+    {% endfor %}
+</div>
+{% endif %}
+{% endblock %}
+
+{% block extra_css %}
+<style>
+    .text-bg-success { background-color: #166534 !important; }
+    .text-bg-error { background-color: #991b1b !important; }
+    .toast { min-width: 300px; border-radius: 0.75rem; }
+</style>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+    document.getElementById('syncForm').addEventListener('submit', function() {
+        document.getElementById('syncBtn').disabled = true;
+        document.getElementById('syncText').textContent = 'Uploading & Syncing...';
+        document.getElementById('syncSpinner').style.display = 'inline-block';
+        document.getElementById('syncIcon').textContent = '⏳';
+    });
+
+    // Auto-dismiss toasts after 5 seconds
+    setTimeout(function() {
+        document.querySelectorAll('.toast').forEach(function(toast) {
+            new bootstrap.Toast(toast, { delay: 500 }).hide();
+        });
+    }, 5000);
+</script>
 {% endblock %}

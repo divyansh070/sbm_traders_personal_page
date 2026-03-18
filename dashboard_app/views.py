@@ -1,5 +1,7 @@
 from django.shortcuts import render, get_object_or_404, redirect
 from django.db.models import Sum, Avg, Count
+from django.contrib import messages
+from django.core.management import call_command
 from .models import Customer, Payment
 
 def dashboard_overview(request):
@@ -32,7 +34,11 @@ def customer_list(request):
     return render(request, 'dashboard/customer_list.html', context)
 
 def customer_detail(request, customer_id):
-    customer = get_object_or_404(Customer, id=customer_id)
+    try:
+        customer = Customer.objects.get(id=customer_id)
+    except Customer.DoesNotExist:
+        messages.warning(request, 'Customer not found. The database may have been synced — please select from the list below.')
+        return redirect('dashboard:customer_list')
     payments = customer.payments.all().order_by('-date')
     
     total_ordered = payments.aggregate(Sum('amount'))['amount__sum'] or 0
@@ -63,3 +69,25 @@ def update_customer_settings(request, customer_id):
         customer.calculate_cibil_v1()
         customer.calculate_cibil_v2()
     return redirect('dashboard:customer_detail', customer_id=customer_id)
+
+from utils import get_processed_data, import_from_dataframe
+
+def sync_database(request):
+    if request.method == 'POST':
+        excel_file = request.FILES.get('excel_file')
+        if not excel_file:
+            messages.error(request, 'Please select an Excel file to upload.')
+            return redirect('dashboard:overview')
+            
+        try:
+            df = get_processed_data(excel_file)
+            if df is None:
+                messages.error(request, 'Failed to process the uploaded file. Please ensure it is the correct format.')
+                return redirect('dashboard:overview')
+                
+            customers_created, payments_created = import_from_dataframe(df)
+            messages.success(request, f'Database synced successfully! Imported {customers_created} customers and {payments_created} payments.')
+        except Exception as e:
+            messages.error(request, f'Sync failed: {str(e)}')
+    return redirect('dashboard:overview')
+

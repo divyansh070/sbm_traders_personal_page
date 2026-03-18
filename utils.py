@@ -83,12 +83,90 @@ def calculate_features(df, credit_terms=0):
     
     return df
 
-def get_processed_data(filepath):
+def get_processed_data(filepath_or_buffer):
     """
     Orchestrates the loading, cleaning, and feature engineering.
+    Can accept a string filepath or a file-like object (like Django's UploadedFile).
     """
-    df = load_data(filepath)
+    df = load_data(filepath_or_buffer)
     if df is not None:
         df = clean_data(df)
         df = calculate_features(df)
     return df
+
+def import_from_dataframe(df):
+    """
+    Takes a processed DataFrame and performs the optimized bulk import
+    and CIBIL logic. Returns the number of customers and payments created.
+    """
+    from dashboard_app.models import Customer, Payment
+    from django.db.models import Max
+    
+    # 1. Clear existing data
+    # Deleting customers automatically deletes associated payments due to CASCADE
+    Customer.objects.all().delete()
+
+    # 2. Bulk create Customers
+    unique_customers_df = df.drop_duplicates(subset=['CustomerID'])
+    customers_to_create = [
+        Customer(
+            customer_id_str=str(row['CustomerID']), 
+            name=str(row['Customer Name'])
+        )
+        for _, row in unique_customers_df.iterrows()
+    ]
+    Customer.objects.bulk_create(customers_to_create, batch_size=500)
+
+    # Build mapping of customer_id_str -> Customer instance for quick lookup
+    customer_map = {c.customer_id_str: c for c in Customer.objects.all()}
+
+    # 3. Bulk create Payments
+    payments_to_create = []
+    for _, row in df.iterrows():
+        customer_id_str = str(row['CustomerID'])
+        customer = customer_map.get(customer_id_str)
+        if not customer:
+            continue
+            
+        date = row['Date'] if pd.notnull(row['Date']) else None
+        inv_date = row['Invoice Date'] if pd.notnull(row['Invoice Date']) else None
+
+        payments_to_create.append(
+            Payment(
+                customer=customer,
+                date=date,
+                invoice_date=inv_date,
+                amount=row['Amount'],
+                unused_amount=row['Unused Amount'],
+                payment_status=row['Payment_Status'],
+                delay=int(row['Delay']),
+                late_only_delay=int(row['Late_Only_Delay'])
+            )
+        )
+        
+    Payment.objects.bulk_create(payments_to_create, batch_size=2000)
+
+    # 4. Recalculate CIBIL for all customers
+    customers_to_update = []
+    
+    customers_with_max_date = Customer.objects.prefetch_related('payments').annotate(
+        latest_payment_date=Max('payments__date')
+    )
+    
+    for customer in customers_with_max_date:
+        if customer.latest_payment_date:
+            customer.last_order_date = customer.latest_payment_date
+        
+        # Calculate scores without hitting the database per-save
+        customer.calculate_cibil_v1(save=False)
+        customer.calculate_cibil_v2(save=False)
+        customers_to_update.append(customer)
+
+    # Bulk update computed fields
+    Customer.objects.bulk_update(
+        customers_to_update, 
+        ['last_order_date', 'cibil_score_v1', 'cibil_score_v2'],
+        batch_size=500
+    )
+
+    return len(customers_to_create), len(payments_to_create)
