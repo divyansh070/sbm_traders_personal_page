@@ -39,7 +39,13 @@ class Customer(models.Model):
         last_5_late = late_payments[:5]
         
         if last_5_late:
-            avg_delay = sum(p.late_only_delay for p in last_5_late) / len(last_5_late)
+            total_late_amount = sum(float(p.amount) for p in last_5_late if p.amount)
+            if total_late_amount > 0:
+                # Weighted average delay: sum(delay * amount) / sum(amount)
+                avg_delay = sum(p.late_only_delay * float(p.amount or 0) for p in last_5_late) / total_late_amount
+            else:
+                # Fallback to simple average if amounts are 0 or missing
+                avg_delay = sum(p.late_only_delay for p in last_5_late) / len(last_5_late)
         else:
             avg_delay = 0
         days_inactive = 0
@@ -62,12 +68,23 @@ class Customer(models.Model):
         score = 300
         max_score = 1000
         
-        # 1. DELAY LOGIC (uses median to resist outliers)
-        late_delays = [p.late_only_delay for p in self.payments.all() if p.late_only_delay > 0]
-        if late_delays:
-            late_delays.sort()
-            n = len(late_delays)
-            median_delay = (late_delays[n // 2] + late_delays[(n - 1) // 2]) / 2.0
+        # 1. DELAY LOGIC (Amount-Weighted Median to handle installments & outliers)
+        # We only look at payments where delay > 0 and amount > 0
+        late_payments = [p for p in self.payments.all() if p.late_only_delay > 0 and p.amount]
+        
+        if late_payments:
+            # Sort by delay ascending
+            late_payments.sort(key=lambda x: x.late_only_delay)
+            total_late_amount = sum(float(p.amount) for p in late_payments)
+            
+            cumulative_amount = 0
+            median_delay = 0
+            # Find the delay where 50% of the late monetary volume is reached
+            for p in late_payments:
+                cumulative_amount += float(p.amount)
+                if cumulative_amount >= total_late_amount / 2.0:
+                    median_delay = p.late_only_delay
+                    break
         else:
             median_delay = 0
         
@@ -81,7 +98,7 @@ class Customer(models.Model):
             score += 100 - (excess * self.v2_delay_penalty_mult)
             
         # 2. VOLUME BONUS (Log Scale)
-        total_sales = sum(p.amount for p in self.payments.all() if p.amount)
+        total_sales = sum(float(p.amount) for p in self.payments.all() if p.amount)
         if total_sales > 0:
             volume_boost = math.log10(float(total_sales)) * self.v2_volume_boost_mult
             score += volume_boost
