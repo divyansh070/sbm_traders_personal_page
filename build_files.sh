@@ -2,15 +2,13 @@
 set -e
 echo "BUILD START"
 
-# Vercel's static-build environment doesn't have pip installed by default
-echo "Bootstrapping pip..."
-curl https://bootstrap.pypa.io/get-pip.py -o get-pip.py
-python3 get-pip.py --user
-export PATH="$HOME/.local/bin:$PATH"
+# Create a virtual environment to bypass PEP 668 externally-managed errors
+python3 -m venv .venv
+source .venv/bin/activate
 
-python3 -m pip install -r requirements.txt
+pip install -r requirements.txt
 mkdir -p staticfiles
-python3 manage.py collectstatic --noinput --clear
-python3 manage.py migrate --noinput || true
+python manage.py collectstatic --noinput --clear
+python manage.py migrate --noinput || true
 
 echo "BUILD END"
