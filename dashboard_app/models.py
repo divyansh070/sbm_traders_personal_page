@@ -20,6 +20,7 @@ class Customer(models.Model):
     v2_volume_boost_mult = models.FloatField(default=25.0)
     v2_decay_start_days = models.IntegerField(default=90)
     v2_decay_penalty_mult = models.FloatField(default=0.5)
+    v2_volume_percentile = models.FloatField(default=0.5) # Percentile of late money that dictates the baseline delay.
     
     # Cache fields
     last_order_date = models.DateField(null=True, blank=True)
@@ -79,17 +80,17 @@ class Customer(models.Model):
             
             cumulative_amount = 0
             median_delay = 0
-            # Find the delay where 50% of the late monetary volume is reached
+            # Find the delay where the defined percentage of the late monetary volume is reached
             for p in late_payments:
                 cumulative_amount += float(p.amount)
-                if cumulative_amount >= total_late_amount / 2.0:
+                if cumulative_amount >= (total_late_amount * self.v2_volume_percentile):
                     median_delay = p.late_only_delay
                     break
         else:
             median_delay = 0
         
         if median_delay <= self.gold_limit:
-            score += 400  # Gold Class
+            score += 300 # Gold Class
         elif median_delay <= self.average_limit:
             score += 200  # Average Class
         else:
