@@ -2,9 +2,9 @@
 set -e
 echo "BUILD START"
 
-python3.9 -m pip install -r requirements.txt
+pip3 install -r requirements.txt
 mkdir -p staticfiles
-python3.9 manage.py collectstatic --noinput --clear
-python3.9 manage.py migrate --noinput || true
+python3 manage.py collectstatic --noinput --clear
+python3 manage.py migrate --noinput || true
 
 echo "BUILD END"
