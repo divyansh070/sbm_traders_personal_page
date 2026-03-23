@@ -5,14 +5,31 @@ from django.core.management import call_command
 from .models import Customer, Payment
 
 def dashboard_overview(request):
-    total_amount = Payment.objects.aggregate(Sum('amount'))['amount__sum'] or 0
-    total_unused = Payment.objects.aggregate(Sum('unused_amount'))['unused_amount__sum'] or 0
-    avg_delay = Payment.objects.filter(late_only_delay__gt=0).aggregate(Avg('late_only_delay'))['late_only_delay__avg'] or 0
+    payments = Payment.objects.all()
     
-    # Top 10 customers
-    top_customers = Customer.objects.annotate(
-        total_payment=Sum('payments__amount')
-    ).order_by('-total_payment')[:10]
+    unique_invoices_all = set()
+    total_amount = 0
+    for p in payments:
+        if p.amount and (p.customer_id, p.invoice_date, p.amount) not in unique_invoices_all:
+            unique_invoices_all.add((p.customer_id, p.invoice_date, p.amount))
+            total_amount += float(p.amount)
+            
+    total_unused = payments.aggregate(Sum('unused_amount'))['unused_amount__sum'] or 0
+    avg_delay = payments.filter(late_only_delay__gt=0).aggregate(Avg('late_only_delay'))['late_only_delay__avg'] or 0
+    
+    # Top 10 customers calculated cleanly
+    customers = list(Customer.objects.prefetch_related('payments'))
+    for c in customers:
+        unique_invs = set()
+        c_total = 0
+        for p in c.payments.all():
+            if p.amount and (p.invoice_date, p.amount) not in unique_invs:
+                unique_invs.add((p.invoice_date, p.amount))
+                c_total += float(p.amount)
+        c.total_payment_calc = c_total
+        
+    customers.sort(key=lambda x: x.total_payment_calc, reverse=True)
+    top_customers = customers[:10]
     
     context = {
         'total_amount': total_amount,
@@ -23,10 +40,18 @@ def dashboard_overview(request):
     return render(request, 'dashboard/overview.html', context)
 
 def customer_list(request):
-    customers = Customer.objects.annotate(
-        total_ordered=Sum('payments__amount'),
-        order_count=Count('payments')
-    ).order_by('-total_ordered')
+    customers = list(Customer.objects.prefetch_related('payments'))
+    for c in customers:
+        unique_invs = set()
+        c_total = 0
+        for p in c.payments.all():
+            if p.amount and (p.invoice_date, p.amount) not in unique_invs:
+                unique_invs.add((p.invoice_date, p.amount))
+                c_total += float(p.amount)
+        c.total_ordered = c_total
+        c.order_count = len(unique_invs)
+        
+    customers.sort(key=lambda x: x.total_ordered, reverse=True)
     
     context = {
         'customers': customers
@@ -41,7 +66,12 @@ def customer_detail(request, customer_id):
         return redirect('dashboard:customer_list')
     payments = customer.payments.all().order_by('-date')
     
-    total_ordered = payments.aggregate(Sum('amount'))['amount__sum'] or 0
+    unique_invs = set()
+    total_ordered = 0
+    for p in payments:
+        if p.amount and (p.invoice_date, p.amount) not in unique_invs:
+            unique_invs.add((p.invoice_date, p.amount))
+            total_ordered += float(p.amount)
     
     context = {
         'customer': customer,

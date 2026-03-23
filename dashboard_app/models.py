@@ -105,7 +105,13 @@ class Customer(models.Model):
             score += 100 - (excess * self.v2_delay_penalty_mult)
             
         # 2. VOLUME BONUS (Log Scale)
-        total_sales = sum(float(p.amount) for p in self.payments.all() if p.amount)
+        unique_invoices = set()
+        total_sales = 0
+        for p in self.payments.all():
+            if p.amount and (p.invoice_date, p.amount) not in unique_invoices:
+                unique_invoices.add((p.invoice_date, p.amount))
+                total_sales += float(p.amount)
+                
         if total_sales > 0:
             volume_boost = math.log10(float(total_sales)) * self.v2_volume_boost_mult
             score += volume_boost
