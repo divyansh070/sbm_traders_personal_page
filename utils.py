@@ -150,10 +150,10 @@ def import_from_dataframe(df):
         
     Payment.objects.bulk_create(payments_to_create, batch_size=2000)
 
-    # 4. Recalculate CIBIL for all customers
+    # 4. Recalculate CIBIL for all customers footprint-efficiently
     customers_to_update = []
     
-    customers_with_max_date = Customer.objects.prefetch_related('payments').annotate(
+    customers_with_max_date = Customer.objects.annotate(
         latest_payment_date=Max('payments__date')
     )
     
@@ -161,7 +161,7 @@ def import_from_dataframe(df):
         if customer.latest_payment_date:
             customer.last_order_date = customer.latest_payment_date
         
-        # Calculate scores without hitting the database per-save
+        # Calculate scores without hydrating huge querysets into memory
         customer.calculate_cibil_v1(save=False)
         customer.calculate_cibil_v2(save=False)
         customers_to_update.append(customer)
@@ -172,5 +172,5 @@ def import_from_dataframe(df):
         ['last_order_date', 'cibil_score_v1', 'cibil_score_v2'],
         batch_size=500
     )
-
+    
     return len(customers_to_create), len(payments_to_create)
