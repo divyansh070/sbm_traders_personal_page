@@ -4,33 +4,40 @@ from django.contrib import messages
 from django.core.management import call_command
 from .models import Customer, Payment
 from django.utils import timezone
+from django.db import connection
 
 def dashboard_overview(request):
-    payments = Payment.objects.all()
-    
-    unique_invoices_all = set()
-    total_amount = 0
-    for p in payments:
-        if p.amount and (p.customer_id, p.invoice_date, p.amount) not in unique_invoices_all:
-            unique_invoices_all.add((p.customer_id, p.invoice_date, p.amount))
-            total_amount += float(p.amount)
-            
-    total_unused = payments.aggregate(Sum('unused_amount'))['unused_amount__sum'] or 0
-    avg_delay = payments.filter(late_only_delay__gt=0).aggregate(Avg('late_only_delay'))['late_only_delay__avg'] or 0
-    
-    # Top 10 customers calculated cleanly
-    customers = list(Customer.objects.prefetch_related('payments'))
-    for c in customers:
-        unique_invs = set()
-        c_total = 0
-        for p in c.payments.all():
-            if p.amount and (p.invoice_date, p.amount) not in unique_invs:
-                unique_invs.add((p.invoice_date, p.amount))
-                c_total += float(p.amount)
-        c.total_payment = c_total
+    with connection.cursor() as cursor:
+        # Global Total Sales
+        cursor.execute("""
+            SELECT SUM(amount) FROM (
+                SELECT DISTINCT customer_id, invoice_date, amount
+                FROM dashboard_app_payment
+                WHERE amount IS NOT NULL
+            ) u
+        """)
+        row = cursor.fetchone()
+        total_amount = float(row[0] or 0)
         
-    customers.sort(key=lambda x: x.total_payment, reverse=True)
-    top_customers = customers[:10]
+        # Top 10 Customers
+        cursor.execute("""
+            SELECT c.id, c.name, SUM(u.amount) as total_sales
+            FROM dashboard_app_customer c
+            JOIN (
+                SELECT DISTINCT customer_id, invoice_date, amount
+                FROM dashboard_app_payment
+                WHERE amount IS NOT NULL
+            ) u ON c.id = u.customer_id
+            GROUP BY c.id, c.name
+            ORDER BY total_sales DESC
+            LIMIT 10
+        """)
+        top_customers = []
+        for row in cursor.fetchall():
+            top_customers.append({'id': row[0], 'name': row[1], 'total_payment': float(row[2] or 0)})
+            
+    total_unused = Payment.objects.aggregate(Sum('unused_amount'))['unused_amount__sum'] or 0
+    avg_delay = Payment.objects.filter(late_only_delay__gt=0).aggregate(Avg('late_only_delay'))['late_only_delay__avg'] or 0
     
     context = {
         'total_amount': total_amount,
@@ -41,15 +48,20 @@ def dashboard_overview(request):
     return render(request, 'dashboard/overview.html', context)
 
 def pending_collections(request):
-    customers = Customer.objects.annotate(
+    customers = list(Customer.objects.annotate(
         total_outstanding=Sum('payments__unused_amount')
-    ).filter(total_outstanding__gt=0).order_by('-total_outstanding')
+    ).filter(total_outstanding__gt=0).order_by('-total_outstanding').prefetch_related('payments'))
     
     today = timezone.now().date()
     for c in customers:
-        c.pending_invoices = c.payments.filter(unused_amount__gt=0).order_by('invoice_date')
+        # Python-side filtering to use prefetch cache and prevent N+1 DB hit
+        pending = [p for p in c.payments.all() if p.unused_amount and p.unused_amount > 0]
+        # Custom sorting logic handling Nones
+        def _sort_key(p):
+            return p.invoice_date or p.date or today
+        c.pending_invoices = sorted(pending, key=_sort_key)
+        
         for inv in c.pending_invoices:
-            # Calculate ongoing delay since the last payment (if they made a partial payment) or since the invoice was issued
             if inv.date:
                 inv.ongoing_delay = (today - inv.date).days
             elif inv.invoice_date:
@@ -63,18 +75,24 @@ def pending_collections(request):
     return render(request, 'dashboard/pending_collections.html', context)
 
 def customer_list(request):
-    customers = list(Customer.objects.prefetch_related('payments'))
-    for c in customers:
-        unique_invs = set()
-        c_total = 0
-        for p in c.payments.all():
-            if p.amount and (p.invoice_date, p.amount) not in unique_invs:
-                unique_invs.add((p.invoice_date, p.amount))
-                c_total += float(p.amount)
-        c.total_ordered = c_total
-        c.order_count = len(unique_invs)
-        
-    customers.sort(key=lambda x: x.total_ordered, reverse=True)
+    with connection.cursor() as cursor:
+        cursor.execute("""
+            SELECT c.id, c.name, SUM(u.amount) as total_ordered, COUNT(u.amount) as order_count, c.cibil_score_v1, c.cibil_score_v2
+            FROM dashboard_app_customer c
+            LEFT JOIN (
+                SELECT DISTINCT customer_id, invoice_date, amount
+                FROM dashboard_app_payment
+                WHERE amount IS NOT NULL
+            ) u ON c.id = u.customer_id
+            GROUP BY c.id, c.name, c.cibil_score_v1, c.cibil_score_v2
+            ORDER BY total_ordered DESC NULLS LAST
+        """)
+        customers = []
+        for row in cursor.fetchall():
+            customers.append({
+                'id': row[0], 'name': row[1], 'total_ordered': float(row[2] or 0), 
+                'order_count': row[3] or 0, 'cibil_score_v1': row[4], 'cibil_score_v2': row[5]
+            })
     
     context = {
         'customers': customers
@@ -89,12 +107,16 @@ def customer_detail(request, customer_id):
         return redirect('dashboard:customer_list')
     payments = customer.payments.all().order_by('-date')
     
-    unique_invs = set()
-    total_ordered = 0
-    for p in payments:
-        if p.amount and (p.invoice_date, p.amount) not in unique_invs:
-            unique_invs.add((p.invoice_date, p.amount))
-            total_ordered += float(p.amount)
+    with connection.cursor() as cursor:
+        cursor.execute("""
+            SELECT SUM(amount) FROM (
+                SELECT DISTINCT invoice_date, amount
+                FROM dashboard_app_payment
+                WHERE customer_id = %s AND amount IS NOT NULL
+            ) u
+        """, [customer_id])
+        row = cursor.fetchone()
+        total_ordered = float(row[0] or 0)
     
     context = {
         'customer': customer,
