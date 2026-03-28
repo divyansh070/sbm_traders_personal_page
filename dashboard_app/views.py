@@ -48,27 +48,52 @@ def dashboard_overview(request):
     return render(request, 'dashboard/overview.html', context)
 
 def pending_collections(request):
-    customers = list(Customer.objects.annotate(
-        total_outstanding=Sum('payments__unused_amount')
-    ).filter(total_outstanding__gt=0).order_by('-total_outstanding').prefetch_related('payments'))
-    
-    today = timezone.now().date()
-    for c in customers:
-        # Python-side filtering to use prefetch cache and prevent N+1 DB hit
-        pending = [p for p in c.payments.all() if p.unused_amount and p.unused_amount > 0]
-        # Custom sorting logic handling Nones
-        def _sort_key(p):
-            return p.invoice_date or p.date or today
-        c.pending_invoices = sorted(pending, key=_sort_key)
+    with connection.cursor() as cursor:
+        # Get customers with outstanding balances
+        cursor.execute("""
+            SELECT c.id, c.name, SUM(p.unused_amount) as total_outstanding
+            FROM dashboard_app_customer c
+            JOIN dashboard_app_payment p ON c.id = p.customer_id
+            WHERE p.unused_amount > 0
+            GROUP BY c.id, c.name
+            ORDER BY total_outstanding DESC
+        """)
         
-        for inv in c.pending_invoices:
-            if inv.date:
-                inv.ongoing_delay = (today - inv.date).days
-            elif inv.invoice_date:
-                inv.ongoing_delay = (today - inv.invoice_date).days
-            else:
-                inv.ongoing_delay = 0
-                
+        customers = []
+        customer_map = {}
+        for row in cursor.fetchall():
+            c = {'id': row[0], 'name': row[1], 'total_outstanding': float(row[2] or 0), 'pending_invoices': []}
+            customers.append(c)
+            customer_map[c['id']] = c
+            
+        # Get only the outstanding invoices
+        if customers:
+            cursor.execute("""
+                SELECT customer_id, invoice_date, date, unused_amount, delay
+                FROM dashboard_app_payment
+                WHERE unused_amount > 0
+                ORDER BY invoice_date ASC NULLS LAST
+            """)
+            
+            today = timezone.now().date()
+            for row in cursor.fetchall():
+                cid, inv_date, p_date, unused, delay = row
+                if cid in customer_map:
+                    # Calculate ongoing delay
+                    ongoing_delay = 0
+                    if p_date:
+                        ongoing_delay = (today - p_date).days
+                    elif inv_date:
+                        ongoing_delay = (today - inv_date).days
+                        
+                    customer_map[cid]['pending_invoices'].append({
+                        'invoice_date': inv_date,
+                        'date': p_date,
+                        'unused_amount': float(unused or 0),
+                        'delay': delay,
+                        'ongoing_delay': ongoing_delay
+                    })
+                    
     context = {
         'customers': customers
     }

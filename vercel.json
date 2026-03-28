@@ -11,5 +11,15 @@
             "src": "sbm_website/wsgi.py",
             "use": "@vercel/python"
         }
+    ],
+    "routes": [
+        {
+            "src": "/static/(.*)",
+            "dest": "/static/$1"
+        },
+        {
+            "src": "/(.*)",
+            "dest": "sbm_website/wsgi.py"
+        }
     ]
 }
