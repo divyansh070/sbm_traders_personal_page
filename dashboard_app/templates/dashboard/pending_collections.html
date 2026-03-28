@@ -1,0 +1,59 @@
+{% extends 'dashboard/base.html' %}
+
+{% block title %}Pending Collections - SBM Traders{% endblock %}
+
+{% block content %}
+<div class="row mb-4">
+    <div class="col-md-12">
+        <h1 class="fw-bold">Pending Collections</h1>
+        <p class="text-secondary">Customers who currently owe outstanding balances.</p>
+    </div>
+</div>
+
+<div class="row">
+    <div class="col-md-12">
+        <div class="glass-panel">
+            <div class="table-responsive">
+                <table class="table table-hover">
+                    <thead>
+                        <tr>
+                            <th>Customer Name</th>
+                            <th>Total Outstanding</th>
+                            <th>Pending Invoices</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for customer in customers %}
+                        <tr>
+                            <td class="align-middle">
+                                <a href="{% url 'dashboard:customer_detail' customer.id %}" class="fw-bold text-decoration-none text-info">
+                                    {{ customer.name }}
+                                </a>
+                            </td>
+                            <td class="align-middle">
+                                <span class="badge bg-danger fs-6 rounded-pill">₹{{ customer.total_outstanding|floatformat:2 }}</span>
+                            </td>
+                            <td>
+                                <ul class="list-unstyled mb-0">
+                                {% for inv in customer.pending_invoices %}
+                                    <li class="text-secondary small">
+                                        {% if inv.invoice_date %}{{ inv.invoice_date|date:"d M Y" }}{% else %}No Date{% endif %} &mdash; 
+                                        Owes: <strong class="text-light">₹{{ inv.unused_amount|floatformat:2 }}</strong>
+                                        <span class="text-muted">(Delay: {% if inv.delay > 0 %}<span class="text-warning">{{ inv.delay }} days</span>{% else %}{{ inv.delay }} days{% endif %})</span>
+                                    </li>
+                                {% endfor %}
+                                </ul>
+                            </td>
+                        </tr>
+                        {% empty %}
+                        <tr>
+                            <td colspan="3" class="text-center text-secondary py-4">No outstanding balances found. Great job!</td>
+                        </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}

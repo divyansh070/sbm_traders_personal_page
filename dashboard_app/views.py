@@ -39,6 +39,19 @@ def dashboard_overview(request):
     }
     return render(request, 'dashboard/overview.html', context)
 
+def pending_collections(request):
+    customers = Customer.objects.annotate(
+        total_outstanding=Sum('payments__unused_amount')
+    ).filter(total_outstanding__gt=0).order_by('-total_outstanding')
+    
+    for c in customers:
+        c.pending_invoices = c.payments.filter(unused_amount__gt=0).order_by('invoice_date')
+        
+    context = {
+        'customers': customers
+    }
+    return render(request, 'dashboard/pending_collections.html', context)
+
 def customer_list(request):
     customers = list(Customer.objects.prefetch_related('payments'))
     for c in customers:
