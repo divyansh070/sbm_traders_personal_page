@@ -26,9 +26,9 @@ def dashboard_overview(request):
             if p.amount and (p.invoice_date, p.amount) not in unique_invs:
                 unique_invs.add((p.invoice_date, p.amount))
                 c_total += float(p.amount)
-        c.total_payment_calc = c_total
+        c.total_payment = c_total
         
-    customers.sort(key=lambda x: x.total_payment_calc, reverse=True)
+    customers.sort(key=lambda x: x.total_payment, reverse=True)
     top_customers = customers[:10]
     
     context = {
