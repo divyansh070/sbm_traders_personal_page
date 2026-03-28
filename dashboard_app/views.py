@@ -1,3 +1,8 @@
+from django.shortcuts import render, get_object_or_404, redirect
+from django.db.models import Sum, Avg, Count
+from django.contrib import messages
+from django.core.management import call_command
+from .models import Customer, Payment
 from django.utils import timezone
 
 def dashboard_overview(request):
