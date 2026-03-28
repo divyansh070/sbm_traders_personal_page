@@ -1,8 +1,4 @@
-from django.shortcuts import render, get_object_or_404, redirect
-from django.db.models import Sum, Avg, Count
-from django.contrib import messages
-from django.core.management import call_command
-from .models import Customer, Payment
+from django.utils import timezone
 
 def dashboard_overview(request):
     payments = Payment.objects.all()
@@ -44,9 +40,18 @@ def pending_collections(request):
         total_outstanding=Sum('payments__unused_amount')
     ).filter(total_outstanding__gt=0).order_by('-total_outstanding')
     
+    today = timezone.now().date()
     for c in customers:
         c.pending_invoices = c.payments.filter(unused_amount__gt=0).order_by('invoice_date')
-        
+        for inv in c.pending_invoices:
+            # Calculate ongoing delay since the last payment (if they made a partial payment) or since the invoice was issued
+            if inv.date:
+                inv.ongoing_delay = (today - inv.date).days
+            elif inv.invoice_date:
+                inv.ongoing_delay = (today - inv.invoice_date).days
+            else:
+                inv.ongoing_delay = 0
+                
     context = {
         'customers': customers
     }
