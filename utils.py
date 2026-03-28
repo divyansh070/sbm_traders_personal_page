@@ -157,13 +157,21 @@ def import_from_dataframe(df):
         latest_payment_date=Max('payments__date')
     )
     
+    # Pre-load all payments into memory (1 Query total for 900-50,000 rows, fast)
+    from collections import defaultdict
+    all_payments = Payment.objects.all()
+    payments_by_customer = defaultdict(list)
+    for p in all_payments:
+        payments_by_customer[p.customer_id].append(p)
+    
     for customer in customers_with_max_date:
         if customer.latest_payment_date:
             customer.last_order_date = customer.latest_payment_date
         
-        # Calculate scores without hydrating huge querysets into memory
-        customer.calculate_cibil_v1(save=False)
-        customer.calculate_cibil_v2(save=False)
+        # Calculate scores completely in-memory (0 database roundtrips)
+        cust_payments = payments_by_customer.get(customer.id, [])
+        customer.calculate_cibil_v1(save=False, payments_list=cust_payments)
+        customer.calculate_cibil_v2(save=False, payments_list=cust_payments)
         customers_to_update.append(customer)
 
     # Bulk update computed fields

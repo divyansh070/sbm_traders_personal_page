@@ -28,14 +28,17 @@ class Customer(models.Model):
     def __str__(self):
         return self.name
 
-    def calculate_cibil_v1(self, save=True):
+    def calculate_cibil_v1(self, save=True, payments_list=None):
         """
         Calculates CIBIL score (V1) between 100 and 1000.
         Score = 1000 - (Avg Delay * Weight) - (Days Inactive * Weight)
         """
         base_score = 1000
         
-        all_payments = sorted(self.payments.all(), key=lambda p: p.date if p.date else timezone.now().date(), reverse=True)
+        if payments_list is None:
+            payments_list = list(self.payments.all())
+            
+        all_payments = sorted(payments_list, key=lambda p: p.date if p.date else timezone.now().date(), reverse=True)
         late_payments = [p for p in all_payments if p.late_only_delay > 0]
         last_5_late = late_payments[:5]
         
@@ -67,7 +70,7 @@ class Customer(models.Model):
             self.save(update_fields=['cibil_score_v1'])
         return self.cibil_score_v1
 
-    def calculate_cibil_v2(self, save=True):
+    def calculate_cibil_v2(self, save=True, payments_list=None):
         """
         Calculates CIBIL score (V2) between 300 and 1000.
         Logic based on thresholds for delay, log-scale volume boost, and inactivity decay.
@@ -75,9 +78,12 @@ class Customer(models.Model):
         score = 300
         max_score = 1000
         
+        if payments_list is None:
+            payments_list = list(self.payments.all())
+        
         # 1. DELAY LOGIC (Amount-Weighted Median to handle installments & outliers)
         # We only look at payments where delay > 0 and amount > 0
-        late_payments = [p for p in self.payments.all() if p.late_only_delay > 0 and p.amount]
+        late_payments = [p for p in payments_list if p.late_only_delay > 0 and p.amount]
         
         if late_payments:
             # Sort by delay ascending
@@ -107,7 +113,7 @@ class Customer(models.Model):
         # 2. VOLUME BONUS (Log Scale)
         unique_invoices = set()
         total_sales = 0
-        for p in self.payments.all():
+        for p in payments_list:
             if p.amount and (p.invoice_date, p.amount) not in unique_invoices:
                 unique_invoices.add((p.invoice_date, p.amount))
                 total_sales += float(p.amount)
