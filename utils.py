@@ -10,6 +10,17 @@ def load_data(filepath):
         df = pd.read_excel(filepath)
         # Drop columns that are completely empty
         df_cleaned = df.dropna(axis=1, how='all')
+        
+        # Strip trailing/leading whitespaces from column names
+        df_cleaned.columns = df_cleaned.columns.str.strip()
+        
+        # Map common alternatives to 'Date' if 'Date' not found but others are
+        if 'Date' not in df_cleaned.columns:
+            for alt in ['Payment Date', 'Receipt Date', 'Payment_Date']:
+                if alt in df_cleaned.columns:
+                    df_cleaned = df_cleaned.rename(columns={alt: 'Date'})
+                    break
+                    
         return df_cleaned
     except Exception as e:
         print(f"Error loading data: {e}")
