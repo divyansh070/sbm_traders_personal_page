@@ -1,6 +1,61 @@
 import pandas as pd
 import numpy as np
 from datetime import datetime
+import os
+import json
+def agentic_map_columns(excel_columns):
+    """
+    Asks the AI to match the uploaded Excel columns to our required database columns.
+    Uses fallback deterministic logic if API key isn't provided or call fails.
+    """
+    required_columns = ["Date", "Invoice Date", "CustomerID", "Customer Name", "Amount", "Unused Amount"]
+    excel_cols_list = list(excel_columns)
+    
+    api_key = os.environ.get("GEMINI_API_KEY")
+    if api_key:
+        try:
+            import google.generativeai as genai
+            genai.configure(api_key=api_key)
+            model = genai.GenerativeModel('gemini-1.5-flash')
+            
+            prompt = f"""
+            You are a data pipeline assistant. 
+            Match the following uploaded Excel columns to our system's required columns.
+            
+            Uploaded Columns: {excel_cols_list}
+            Required System Columns: {required_columns}
+            
+            Return ONLY a valid JSON dictionary where the keys are the Uploaded Columns and the values are the Required System Columns. 
+            If an uploaded column doesn't match any required column, DO NOT include it in the dictionary.
+            """
+            response = model.generate_content(prompt)
+            # Find JSON block if hidden in markdown
+            text = response.text.strip()
+            if "```" in text:
+                text = text.split("```")[1].strip()
+                if text.startswith("json"):
+                    text = text[4:].strip()
+            return json.loads(text)
+        except Exception as e:
+            print(f"Agentic mapping failed: {e}. Falling back to heuristic mapping.")
+            
+    # Fallback heuristic mapping
+    rename_map = {}
+    for col in excel_cols_list:
+        lower_col = str(col).lower().strip()
+        if lower_col in ['payment date', 'receipt date', 'payment_date', 'date']:
+            rename_map[col] = 'Date'
+        elif lower_col in ['customer id', 'customer_id']:
+            rename_map[col] = 'CustomerID'
+        elif lower_col in ['customer name', 'customer_name']:
+            rename_map[col] = 'Customer Name'
+        elif lower_col in ['amount', 'payment amount']:
+            rename_map[col] = 'Amount'
+        elif lower_col in ['unused amount', 'unused_amount']:
+            rename_map[col] = 'Unused Amount'
+        elif lower_col in ['invoice date', 'invoice_date']:
+            rename_map[col] = 'Invoice Date'
+    return rename_map
 
 def load_data(filepath):
     """
@@ -21,26 +76,9 @@ def load_data(filepath):
         # Drop columns that are completely empty
         df_cleaned = df.dropna(axis=1, how='all')
         
-        # Ensure column names are strings before stripping
-        df_cleaned.columns = df_cleaned.columns.astype(str).str.strip()
+        # Determine column mappings using Agent (or fallback)
+        rename_map = agentic_map_columns(df_cleaned.columns)
         
-        # Map common alternatives to expected Capitalized names
-        rename_map = {}
-        for col in df_cleaned.columns:
-            lower_col = col.lower()
-            if lower_col in ['payment date', 'receipt date', 'payment_date', 'date']:
-                rename_map[col] = 'Date'
-            elif lower_col in ['customer id', 'customer_id']:
-                rename_map[col] = 'CustomerID'
-            elif lower_col in ['customer name', 'customer_name']:
-                rename_map[col] = 'Customer Name'
-            elif lower_col in ['amount', 'payment amount']:
-                rename_map[col] = 'Amount'
-            elif lower_col in ['unused amount', 'unused_amount']:
-                rename_map[col] = 'Unused Amount'
-            elif lower_col in ['invoice date', 'invoice_date']:
-                rename_map[col] = 'Invoice Date'
-                
         if rename_map:
             df_cleaned = df_cleaned.rename(columns=rename_map)
             

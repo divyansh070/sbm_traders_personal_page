@@ -21,6 +21,7 @@ et_xmlfile==2.0.0
 executing==2.2.1
 fonttools==4.61.1
 gunicorn==25.1.0
+google-generativeai==0.8.3
 ipykernel==7.1.0
 ipython==9.9.0
 ipython_pygments_lexers==1.1.1
