@@ -88,9 +88,15 @@ def calculate_features(df, credit_terms=0):
     df['Payment_Fraction'] = df.apply(calculate_payment_fraction, axis=1)
     
     # Ensure datetime format
+    if 'Date' not in df.columns:
+        df['Date'] = pd.Timestamp.now().normalize()
     df['Date'] = pd.to_datetime(df['Date'], errors='coerce')
-    df['Invoice Date'] = pd.to_datetime(df['Invoice Date'], errors='coerce')
-    df['Invoice Date'] = df['Invoice Date'].fillna(df['Date'])
+    
+    if 'Invoice Date' not in df.columns:
+        df['Invoice Date'] = df['Date']
+    else:
+        df['Invoice Date'] = pd.to_datetime(df['Invoice Date'], errors='coerce')
+        df['Invoice Date'] = df['Invoice Date'].fillna(df['Date'])
 
     current_date = pd.Timestamp.now().normalize()
     
