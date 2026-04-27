@@ -5,22 +5,45 @@ from datetime import datetime
 def load_data(filepath):
     """
     Loads the Excel file and drops completely empty columns.
+    Handles Zoho/Tally export format with title in first row.
     """
     try:
         df = pd.read_excel(filepath)
+        
+        # Check if the headers are actually in the first row (Zoho export format)
+        if any('Unnamed:' in str(c) for c in df.columns):
+            # The real headers are in the first row of data
+            new_headers = df.iloc[0]
+            df = df[1:]
+            df.columns = new_headers
+            df.reset_index(drop=True, inplace=True)
+            
         # Drop columns that are completely empty
         df_cleaned = df.dropna(axis=1, how='all')
         
-        # Strip trailing/leading whitespaces from column names
-        df_cleaned.columns = df_cleaned.columns.str.strip()
+        # Ensure column names are strings before stripping
+        df_cleaned.columns = df_cleaned.columns.astype(str).str.strip()
         
-        # Map common alternatives to 'Date' if 'Date' not found but others are
-        if 'Date' not in df_cleaned.columns:
-            for alt in ['Payment Date', 'Receipt Date', 'Payment_Date']:
-                if alt in df_cleaned.columns:
-                    df_cleaned = df_cleaned.rename(columns={alt: 'Date'})
-                    break
-                    
+        # Map common alternatives to expected Capitalized names
+        rename_map = {}
+        for col in df_cleaned.columns:
+            lower_col = col.lower()
+            if lower_col in ['payment date', 'receipt date', 'payment_date', 'date']:
+                rename_map[col] = 'Date'
+            elif lower_col in ['customer id', 'customer_id']:
+                rename_map[col] = 'CustomerID'
+            elif lower_col in ['customer name', 'customer_name']:
+                rename_map[col] = 'Customer Name'
+            elif lower_col in ['amount', 'payment amount']:
+                rename_map[col] = 'Amount'
+            elif lower_col in ['unused amount', 'unused_amount']:
+                rename_map[col] = 'Unused Amount'
+            elif lower_col in ['invoice date', 'invoice_date']:
+                rename_map[col] = 'Invoice Date'
+                
+        if rename_map:
+            df_cleaned = df_cleaned.rename(columns=rename_map)
+            
         return df_cleaned
     except Exception as e:
         print(f"Error loading data: {e}")
