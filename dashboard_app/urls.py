@@ -10,4 +10,6 @@ urlpatterns = [
     path('customers/<int:customer_id>/update_settings/', views.update_customer_settings, name='update_customer_settings'),
     path('collections/', views.pending_collections, name='pending_collections'),
     path('sync/', views.sync_database, name='sync_database'),
+    path('sync_google_sheet/', views.sync_google_sheet, name='sync_google_sheet'),
+    path('settings/', views.global_settings, name='global_settings'),
 ]

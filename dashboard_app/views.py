@@ -2,7 +2,7 @@ from django.shortcuts import render, get_object_or_404, redirect
 from django.db.models import Sum, Avg, Count
 from django.contrib import messages
 from django.core.management import call_command
-from .models import Customer, Payment
+from .models import Customer, Payment, SystemSettings
 from django.utils import timezone
 from django.db import connection
 
@@ -191,3 +191,38 @@ def sync_database(request):
             messages.error(request, f'Sync failed: {str(e)}')
     return redirect('dashboard:overview')
 
+from utils import get_processed_data_from_google_sheet
+
+def sync_google_sheet(request):
+    if request.method == 'POST':
+        settings = SystemSettings.get_settings()
+        if not settings.google_sheet_url:
+            messages.error(request, 'No Google Sheet URL is configured. Please set it in Global Settings.')
+            return redirect('dashboard:overview')
+            
+        try:
+            df = get_processed_data_from_google_sheet(settings.google_sheet_url)
+            if df is None:
+                messages.error(request, 'Failed to download or process the Google Sheet. Please check the URL and its sharing permissions.')
+                return redirect('dashboard:overview')
+                
+            customers_created, payments_created = import_from_dataframe(df)
+            messages.success(request, f'Google Sheet synced successfully! Imported {customers_created} customers and {payments_created} payments.')
+        except Exception as e:
+            messages.error(request, f'Google Sheet sync failed: {str(e)}')
+    return redirect('dashboard:overview')
+
+def global_settings(request):
+    settings = SystemSettings.get_settings()
+    
+    if request.method == 'POST':
+        google_sheet_url = request.POST.get('google_sheet_url', '').strip()
+        settings.google_sheet_url = google_sheet_url
+        settings.save()
+        messages.success(request, 'Global settings saved successfully.')
+        return redirect('dashboard:global_settings')
+        
+    context = {
+        'settings': settings
+    }
+    return render(request, 'dashboard/settings.html', context)

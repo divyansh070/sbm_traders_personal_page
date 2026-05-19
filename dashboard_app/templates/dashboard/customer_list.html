@@ -3,25 +3,32 @@
 {% block title %}All Customers - SBM Traders{% endblock %}
 
 {% block content %}
-<div class="row mb-5">
-    <div class="col-md-12">
-        <h1 class="fw-bold">All Customers</h1>
-        <p class="text-secondary">Ranked by total order amount.</p>
+<div class="row mb-5 fade-in-up align-items-center">
+    <div class="col-md-8">
+        <h1 class="fw-bold text-gradient">All Customers</h1>
+        <p class="text-secondary mb-0">Ranked by total order amount.</p>
+    </div>
+    <div class="col-md-4 mt-3 mt-md-0">
+        <input type="text" id="customerSearch" class="form-control" placeholder="Search by name or ID...">
     </div>
 </div>
 
-<div class="glass-panel">
+<div class="glass-panel fade-in-up" style="animation-delay: 0.1s;">
     <div class="table-responsive">
         <table class="table">
             <thead>
                 <tr>
                     <th>Rank</th>
                     <th>Customer Name</th>
-                    <th>Customer ID</th>
-                    <th class="text-center">CIBIL (Dynamic)</th>
-                    <th class="text-center">CIBIL (Standard)</th>
-                    <th class="text-center">Orders</th>
-                    <th class="text-end">Total Amount</th>
+                    <th>Customers id </th>
+                    <th class="text-center sortable-col" onclick="sortTable(3, 'num')">CIBIL (Dynamic) <span
+                            class="sort-icon text-secondary ms-1">↕</span></th>
+                    <th class="text-center sortable-col" onclick="sortTable(4, 'num')">CIBIL (Standard) <span
+                            class="sort-icon text-secondary ms-1">↕</span></th>
+                    <th class="text-center sortable-col" onclick="sortTable(5, 'num')">Orders <span
+                            class="sort-icon text-secondary ms-1">↕</span></th>
+                    <th class="text-end sortable-col" onclick="sortTable(6, 'curr')">Total Amount <span
+                            class="sort-icon text-secondary ms-1">↕</span></th>
                 </tr>
             </thead>
             <tbody>
@@ -62,4 +69,79 @@
         </table>
     </div>
 </div>
+
+{% block extra_js %}
+<script>
+    document.getElementById('customerSearch').addEventListener('keyup', function () {
+        let filter = this.value.toLowerCase();
+        let rows = document.querySelectorAll('.table tbody tr');
+
+        rows.forEach(row => {
+            let nameCell = row.cells[1].textContent.toLowerCase();
+            let idCell = row.cells[2].textContent.toLowerCase();
+            if (nameCell.includes(filter) || idCell.includes(filter)) {
+                row.style.display = '';
+            } else {
+                row.style.display = 'none';
+            }
+        });
+    });
+
+    let sortDirections = [true, true, true, true, true, true, true];
+
+    function sortTable(colIndex, type) {
+        let table = document.querySelector(".table tbody");
+        let rows = Array.from(table.querySelectorAll("tr"));
+        let direction = sortDirections[colIndex] ? 1 : -1;
+        sortDirections[colIndex] = !sortDirections[colIndex];
+
+        // Reset all icons to ↕
+        document.querySelectorAll('.sort-icon').forEach(icon => {
+            icon.textContent = '↕';
+            icon.classList.replace('text-info', 'text-secondary');
+        });
+
+        // Set the active icon
+        let ths = document.querySelectorAll('.table thead th');
+        let activeIcon = ths[colIndex].querySelector('.sort-icon');
+        activeIcon.textContent = direction === 1 ? '↓' : '↑';
+        activeIcon.classList.replace('text-secondary', 'text-info');
+
+        rows.sort((a, b) => {
+            let valA = a.cells[colIndex].textContent.trim();
+            let valB = b.cells[colIndex].textContent.trim();
+
+            if (type === 'curr') {
+                valA = parseFloat(valA.replace(/[^0-9.-]+/g, "")) || 0;
+                valB = parseFloat(valB.replace(/[^0-9.-]+/g, "")) || 0;
+            } else if (type === 'num') {
+                valA = parseFloat(valA) || 0;
+                valB = parseFloat(valB) || 0;
+            }
+
+            if (valA < valB) return -1 * direction;
+            if (valA > valB) return 1 * direction;
+            return 0;
+        });
+
+        rows.forEach(row => table.appendChild(row));
+
+        // Update rank column visually
+        rows.forEach((row, index) => {
+            row.cells[0].textContent = index + 1;
+        });
+    }
+</script>
+<style>
+    .sortable-col {
+        cursor: pointer;
+        user-select: none;
+        transition: background-color 0.2s;
+    }
+
+    .sortable-col:hover {
+        background-color: rgba(255, 255, 255, 0.05) !important;
+    }
+</style>
+{% endblock %}
 {% endblock %}

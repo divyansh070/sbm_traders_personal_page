@@ -1,0 +1,57 @@
+{% extends 'dashboard/base.html' %}
+
+{% block title %}Global Settings - SBM Traders{% endblock %}
+
+{% block content %}
+<div class="row mb-4 fade-in-up">
+    <div class="col-md-12">
+        <nav aria-label="breadcrumb">
+            <ol class="breadcrumb">
+                <li class="breadcrumb-item"><a href="{% url 'dashboard:overview' %}">Dashboard</a></li>
+                <li class="breadcrumb-item active" aria-current="page">Global Settings</li>
+            </ol>
+        </nav>
+        <h1 class="fw-bold text-gradient">Global Settings</h1>
+        <p class="text-secondary">Configure system-wide parameters and integrations.</p>
+    </div>
+</div>
+
+<div class="row fade-in-up" style="animation-delay: 0.1s;">
+    <div class="col-md-8">
+        <div class="glass-panel">
+            <h3 class="mb-4">Google Sheets Integration</h3>
+            <form method="POST" action="{% url 'dashboard:global_settings' %}">
+                {% csrf_token %}
+                <div class="mb-4">
+                    <label for="google_sheet_url" class="form-label text-light">Google Sheet Public URL</label>
+                    <input type="url" class="form-control" id="google_sheet_url" name="google_sheet_url" value="{{ settings.google_sheet_url|default:'' }}" placeholder="https://docs.google.com/spreadsheets/d/...">
+                    <div class="form-text text-secondary mt-2">
+                        <strong>Instructions:</strong> Open your Google Sheet, click "Share", set general access to "Anyone with the link", and paste the link here.
+                    </div>
+                </div>
+                
+                <div class="d-flex justify-content-between align-items-center">
+                    <button type="submit" class="btn btn-primary px-4">Save Settings</button>
+                    {% if settings.google_sheet_url %}
+                    <span class="badge bg-success bg-opacity-25 text-success border border-success p-2">✓ Configured</span>
+                    {% else %}
+                    <span class="badge bg-warning bg-opacity-25 text-warning border border-warning p-2">Not Configured</span>
+                    {% endif %}
+                </div>
+            </form>
+        </div>
+    </div>
+    
+    <div class="col-md-4">
+        <div class="card p-4 h-100">
+            <h4 class="mb-3">Need Help?</h4>
+            <p class="text-secondary small">
+                Linking a Google Sheet allows you to skip manual Excel uploads. The system will automatically download and process the data whenever you click "Sync from Google Sheet" on the dashboard.
+            </p>
+            <p class="text-secondary small mb-0">
+                Ensure your columns are correctly named (CustomerID, Date, Amount, etc.) so the AI mapping logic can process them successfully.
+            </p>
+        </div>
+    </div>
+</div>
+{% endblock %}

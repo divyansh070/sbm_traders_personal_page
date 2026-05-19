@@ -11,12 +11,12 @@
                 <li class="breadcrumb-item active" aria-current="page">{{ customer.name }}</li>
             </ol>
         </nav>
-        <h1 class="fw-bold">{{ customer.name }}</h1>
+        <h1 class="fw-bold text-gradient">{{ customer.name }}</h1>
         <p class="text-secondary">Customer ID: {{ customer.customer_id_str }}</p>
     </div>
 </div>
 
-<div class="row g-4 mb-5">
+<div class="row g-4 mb-5 fade-in-up" style="animation-delay: 0.1s;">
     <div class="col-md-3">
         <div class="card metric-card">
             <div class="metric-label">Lifetime Total Ordered</div>
@@ -149,7 +149,7 @@
     </div>
 </div>
 
-<div class="glass-panel">
+<div class="glass-panel fade-in-up" style="animation-delay: 0.2s;">
     <h3>Payment History</h3>
     <div class="table-responsive mt-4">
         <table class="table">

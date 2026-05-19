@@ -151,3 +151,20 @@ class Payment(models.Model):
     
     def __str__(self):
         return f"{self.customer.name} - {self.amount} ({self.payment_status})"
+
+class SystemSettings(models.Model):
+    """
+    Singleton model to hold global application settings.
+    """
+    google_sheet_url = models.URLField(max_length=500, blank=True, null=True, help_text="Public URL to the Google Sheet (Anyone with the link can view)")
+    
+    @classmethod
+    def get_settings(cls):
+        settings, created = cls.objects.get_or_create(id=1)
+        return settings
+    
+    def save(self, *args, **kwargs):
+        # Force the ID to be 1 so it acts as a Singleton
+        self.id = 1
+        super().save(*args, **kwargs)
+

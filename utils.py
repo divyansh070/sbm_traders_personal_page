@@ -3,6 +3,10 @@ import numpy as np
 from datetime import datetime
 import os
 import json
+import re
+import requests
+import io
+
 def agentic_map_columns(excel_columns):
     """
     Asks the AI to match the uploaded Excel columns to our required database columns.
@@ -76,7 +80,25 @@ def load_data(filepath):
         # Drop columns that are completely empty
         df_cleaned = df.dropna(axis=1, how='all')
         
-        # Determine column mappings using Agent (or fallback)
+        # Ensure column names are strings before stripping
+        df_cleaned.columns = df_cleaned.columns.astype(str).str.strip()
+        
+        # Map common alternatives to expected Capitalized names
+        rename_map = {}
+        # for col in df_cleaned.columns:
+        #     lower_col = col.lower()
+        #     if lower_col in ['payment date', 'receipt date', 'payment_date', 'date']:
+        #         rename_map[col] = 'Date'
+        #     elif lower_col in ['customer id', 'customer_id']:
+        #         rename_map[col] = 'CustomerID'
+        #     elif lower_col in ['customer name', 'customer_name']:
+        #         rename_map[col] = 'Customer Name'
+        #     elif lower_col in ['amount', 'payment amount']:
+        #         rename_map[col] = 'Amount'
+        #     elif lower_col in ['unused amount', 'unused_amount']:
+        #         rename_map[col] = 'Unused Amount'
+        #     elif lower_col in ['invoice date', 'invoice_date']:
+        #         rename_map[col] = 'Invoice Date'
         rename_map = agentic_map_columns(df_cleaned.columns)
         
         if rename_map:
@@ -175,6 +197,52 @@ def get_processed_data(filepath_or_buffer):
         df = clean_data(df)
         df = calculate_features(df)
     return df
+
+def get_processed_data_from_google_sheet(url):
+    """
+    Downloads a Google Sheet via its public share URL, processes it, and returns the dataframe.
+    """
+    try:
+        # Extract the Document ID from the URL
+        match = re.search(r'/d/([a-zA-Z0-9-_]+)', url)
+        if not match:
+            print("Invalid Google Sheet URL format.")
+            return None
+        
+        sheet_id = match.group(1)
+        # Construct the CSV export URL
+        export_url = f"https://docs.google.com/spreadsheets/d/{sheet_id}/export?format=csv"
+        
+        # Download the CSV
+        response = requests.get(export_url)
+        response.raise_for_status()
+        
+        # Load it into pandas
+        csv_data = io.BytesIO(response.content)
+        # We use pd.read_csv instead of pd.read_excel since we requested a CSV export
+        df = pd.read_csv(csv_data)
+        
+        # Check if the headers are actually in the first row (Zoho export format)
+        if any('Unnamed:' in str(c) for c in df.columns):
+            new_headers = df.iloc[0]
+            df = df[1:]
+            df.columns = new_headers
+            df.reset_index(drop=True, inplace=True)
+            
+        df_cleaned = df.dropna(axis=1, how='all')
+        df_cleaned.columns = df_cleaned.columns.astype(str).str.strip()
+        
+        rename_map = agentic_map_columns(df_cleaned.columns)
+        if rename_map:
+            df_cleaned = df_cleaned.rename(columns=rename_map)
+            
+        if df_cleaned is not None:
+            df_cleaned = clean_data(df_cleaned)
+            df_cleaned = calculate_features(df_cleaned)
+        return df_cleaned
+    except Exception as e:
+        print(f"Error loading from Google Sheet: {e}")
+        return None
 
 def import_from_dataframe(df):
     """
