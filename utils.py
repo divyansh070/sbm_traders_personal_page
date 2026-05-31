@@ -161,25 +161,24 @@ def calculate_features(df, credit_terms=0):
     current_date = pd.Timestamp.now().normalize()
     
     # Status Logic:
-    # 1. Unused Amount > 1 -> Pending Payment 
-    # 2. Unused Amount <= 1 -> Paid
-    df['Payment_Status'] = np.where(df['Unused Amount'] > 1, 'Pending', 'Paid')
+    # In a Payments Received report, Unused Amount represents unapplied Advance Credit, not pending debt.
+    df['Payment_Status'] = np.where(df['Unused Amount'] > 1, 'Advance', 'Paid')
     
     # Calculate Delay
     def get_delay(row):
-        unused = row.get('Unused Amount', 0)
         p_date = row.get('Date')
         inv_date = row.get('Invoice Date')
         
-        if unused > 1:
-            # Partially Paid or Unpaid: Delay is dynamic up to today
-            start_date = p_date if pd.notnull(p_date) else inv_date
-            return (current_date - start_date).days if pd.notnull(start_date) else 0
-        else:
-            # Fully Paid: Delay is frozen at exactly when they paid
-            if pd.notnull(p_date) and pd.notnull(inv_date):
-                return (p_date - inv_date).days
-            return 0
+        if pd.notnull(p_date) and pd.notnull(inv_date):
+            # Payment was made. Delay is frozen at the payment date.
+            return (p_date - inv_date).days
+        elif pd.isnull(p_date) and pd.notnull(inv_date):
+            # Invoice exists but no payment date (Unpaid Invoice).
+            # Delay grows dynamically up to today.
+            return (current_date - inv_date).days
+        
+        # Pure advance or missing dates
+        return 0
             
     df['Days_to_Pay'] = df.apply(get_delay, axis=1)
     df['Delay'] = df['Days_to_Pay'] - credit_terms
