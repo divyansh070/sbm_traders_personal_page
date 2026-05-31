@@ -58,11 +58,7 @@ class Customer(models.Model):
         else:
             days_inactive = 365
                 
-        total_weight = self.delay_weight_v1 + self.inactivity_weight_v1
-        if total_weight > 0:
-            penalty = ((avg_delay * self.delay_weight_v1) + (days_inactive * self.inactivity_weight_v1)) / total_weight
-        else:
-            penalty = 0
+        penalty = (avg_delay * self.delay_weight_v1) + (days_inactive * self.inactivity_weight_v1)
             
         final_score = base_score - penalty
         self.cibil_score_v1 = max(100, min(1000, int(final_score)))
