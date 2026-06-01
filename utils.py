@@ -137,10 +137,29 @@ def calculate_payment_fraction(row):
 
 def calculate_features(df, credit_terms=0):
     """
-    Adds calculated features: Payment_Fraction, Days_Delayed, Late_Only_Delay.
+    Given a raw, cleaned dataframe, calculates the required CIBIL features
+    like Delays, Penalties, Payment Fractions, etc.
     Handles missing Invoice Date by assuming payment on the same day.
     Handles missing Payment Date (Unpaid) by calculating delay relative to Today.
     """
+    
+    # FIX: In 'Payments Received' exports, a single payment clearing multiple invoices 
+    # repeats the total Payment Amount on every row, massively inflating totals.
+    # We must use the 'Amount Applied to Invoice' if it exists.
+    applied_col = None
+    for col in df.columns:
+        if 'applied' in col.lower() and 'amount' in col.lower():
+            applied_col = col
+            break
+            
+    if applied_col:
+        # Replace the 'Amount' with the specific amount applied to this invoice row.
+        # If it's an unapplied advance (NaN), fall back to the total Amount.
+        df['Effective_Amount'] = df[applied_col].fillna(df.get('Amount', 0))
+        df['Amount'] = df['Effective_Amount']
+
+    if 'Amount' not in df.columns:
+        df['Amount'] = 0
     # Create copy to avoid SettingWithCopyWarning
     df = df.copy()
 
