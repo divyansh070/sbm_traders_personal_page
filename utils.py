@@ -12,7 +12,7 @@ def agentic_map_columns(excel_columns):
     Asks the AI to match the uploaded Excel columns to our required database columns.
     Uses fallback deterministic logic if API key isn't provided or call fails.
     """
-    required_columns = ["Date", "Invoice Date", "CustomerID", "Customer Name", "Amount", "Unused Amount"]
+    required_columns = ["Date", "Invoice Date", "CustomerID", "Customer Name", "Amount", "Unused Amount", "External ID"]
     excel_cols_list = list(excel_columns)
     
     api_key = os.environ.get("GEMINI_API_KEY")
@@ -45,6 +45,10 @@ def agentic_map_columns(excel_columns):
             
     # Fallback heuristic mapping
     rename_map = {}
+    
+    # Check if this is likely an AR Aging report (has balance)
+    has_balance = any('balance' in str(c).lower().strip() for c in excel_cols_list)
+    
     for col in excel_cols_list:
         lower_col = str(col).lower().strip()
         if lower_col in ['payment date', 'receipt date', 'payment_date', 'date']:
@@ -54,11 +58,17 @@ def agentic_map_columns(excel_columns):
         elif lower_col in ['customer name', 'customer_name']:
             rename_map[col] = 'Customer Name'
         elif lower_col in ['amount', 'payment amount']:
-            rename_map[col] = 'Amount'
+            # If it's an AR aging report, ignore the total 'amount' and use 'balance' instead
+            if not has_balance:
+                rename_map[col] = 'Amount'
         elif lower_col in ['unused amount', 'unused_amount']:
             rename_map[col] = 'Unused Amount'
-        elif lower_col in ['invoice date', 'invoice_date']:
+        elif lower_col in ['invoice date', 'invoice_date', 'due_date', 'due date']:
             rename_map[col] = 'Invoice Date'
+        elif lower_col in ['customerpayment id', 'entity_id', 'transaction_number', 'payment number']:
+            rename_map[col] = 'External ID'
+        elif lower_col in ['balance']:
+            rename_map[col] = 'Amount'
     return rename_map
 
 def load_data(filepath):
@@ -160,6 +170,14 @@ def calculate_features(df, credit_terms=0):
 
     if 'Amount' not in df.columns:
         df['Amount'] = 0
+        
+    if 'Unused Amount' not in df.columns:
+        df['Unused Amount'] = 0
+        
+    if 'External ID' not in df.columns:
+        # Generate a synthetic external ID based on unique attributes to prevent total duplication
+        df['External ID'] = df.apply(lambda row: f"{row.get('CustomerID', 'unknown')}_{row.get('Invoice Date', 'unknown')}_{row.get('Amount', 0)}_{hash(str(row))}", axis=1)
+
     # Create copy to avoid SettingWithCopyWarning
     df = df.copy()
 
@@ -270,25 +288,36 @@ def import_from_dataframe(df):
     from dashboard_app.models import Customer, Payment
     from django.db.models import Max
     
-    # 1. Clear existing data
-    # Deleting customers automatically deletes associated payments due to CASCADE
-    Customer.objects.all().delete()
-
-    # 2. Bulk create Customers
+    # 1. UPSERT Customers
     unique_customers_df = df.drop_duplicates(subset=['CustomerID'])
-    customers_to_create = [
-        Customer(
-            customer_id_str=str(row['CustomerID']), 
-            name=str(row['Customer Name'])
-        )
-        for _, row in unique_customers_df.iterrows()
-    ]
-    Customer.objects.bulk_create(customers_to_create, batch_size=500)
-
+    customer_ids = unique_customers_df['CustomerID'].astype(str).tolist()
+    
+    # Pre-fetch existing customers
+    existing_customers = {c.customer_id_str: c for c in Customer.objects.filter(customer_id_str__in=customer_ids)}
+    
+    customers_to_create = []
+    customers_to_update = []
+    
+    for _, row in unique_customers_df.iterrows():
+        cid = str(row['CustomerID'])
+        name = str(row['Customer Name'])
+        if cid in existing_customers:
+            c = existing_customers[cid]
+            if c.name != name:
+                c.name = name
+                customers_to_update.append(c)
+        else:
+            customers_to_create.append(Customer(customer_id_str=cid, name=name))
+            
+    if customers_to_create:
+        Customer.objects.bulk_create(customers_to_create, batch_size=500)
+    if customers_to_update:
+        Customer.objects.bulk_update(customers_to_update, ['name'], batch_size=500)
+        
     # Build mapping of customer_id_str -> Customer instance for quick lookup
-    customer_map = {c.customer_id_str: c for c in Customer.objects.all()}
+    customer_map = {c.customer_id_str: c for c in Customer.objects.filter(customer_id_str__in=customer_ids)}
 
-    # 3. Bulk create Payments
+    # 2. UPSERT Payments
     payments_to_create = []
     for _, row in df.iterrows():
         customer_id_str = str(row['CustomerID'])
@@ -298,21 +327,33 @@ def import_from_dataframe(df):
             
         date = row['Date'] if pd.notnull(row['Date']) else None
         inv_date = row['Invoice Date'] if pd.notnull(row['Invoice Date']) else None
+        external_id = str(row.get('External ID', ''))
+
+        amount = row['Amount'] if pd.notnull(row['Amount']) else 0
+        unused_amount = row['Unused Amount'] if pd.notnull(row['Unused Amount']) else 0
 
         payments_to_create.append(
             Payment(
                 customer=customer,
                 date=date,
                 invoice_date=inv_date,
-                amount=row['Amount'],
-                unused_amount=row['Unused Amount'],
+                amount=amount,
+                unused_amount=unused_amount,
                 payment_status=row['Payment_Status'],
                 delay=int(row['Delay']),
-                late_only_delay=int(row['Late_Only_Delay'])
+                late_only_delay=int(row['Late_Only_Delay']),
+                external_id=external_id
             )
         )
         
-    Payment.objects.bulk_create(payments_to_create, batch_size=2000)
+    if payments_to_create:
+        Payment.objects.bulk_create(
+            payments_to_create, 
+            batch_size=2000,
+            update_conflicts=True,
+            unique_fields=['external_id'],
+            update_fields=['date', 'invoice_date', 'amount', 'unused_amount', 'payment_status', 'delay', 'late_only_delay']
+        )
 
     # 4. Recalculate CIBIL for all customers footprint-efficiently
     customers_to_update = []
