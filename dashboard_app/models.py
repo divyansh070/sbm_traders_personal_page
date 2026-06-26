@@ -9,7 +9,7 @@ class Customer(models.Model):
     
     # --- CIBIL V1 (Dynamic) ---
     cibil_score_v1 = models.IntegerField(default=1000)
-    delay_weight_v1 = models.FloatField(default=5.0)
+    delay_weight_v1 = models.FloatField(default=20.0)
     inactivity_weight_v1 = models.FloatField(default=2.0)
     
     # --- CIBIL V2 (Standard) ---
