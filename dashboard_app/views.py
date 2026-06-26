@@ -185,8 +185,15 @@ def sync_database(request):
                 messages.error(request, 'Failed to process the uploaded file. Please ensure it is the correct format.')
                 return redirect('dashboard:overview')
                 
+            # Clear existing payments so the new sheet acts as the source of truth
+            Payment.objects.all().delete()
+                
             customers_created, payments_created = import_from_dataframe(df)
-            messages.success(request, f'Database synced successfully! Imported {customers_created} customers and {payments_created} payments.')
+            
+            # Delete any old customers that no longer have payments in the new sheet
+            deleted_customers, _ = Customer.objects.filter(payments__isnull=True).delete()
+            
+            messages.success(request, f'Database synced successfully! Imported {customers_created} customers and {payments_created} payments. Removed {deleted_customers} old customers.')
         except Exception as e:
             messages.error(request, f'Sync failed: {str(e)}')
     return redirect('dashboard:overview')
@@ -206,8 +213,15 @@ def sync_google_sheet(request):
                 messages.error(request, 'Failed to download or process the Google Sheet. Please check the URL and its sharing permissions.')
                 return redirect('dashboard:overview')
                 
+            # Clear existing payments so the new sheet acts as the source of truth
+            Payment.objects.all().delete()
+                
             customers_created, payments_created = import_from_dataframe(df)
-            messages.success(request, f'Google Sheet synced successfully! Imported {customers_created} customers and {payments_created} payments.')
+            
+            # Delete any old customers that no longer have payments in the new sheet
+            deleted_customers, _ = Customer.objects.filter(payments__isnull=True).delete()
+            
+            messages.success(request, f'Google Sheet synced successfully! Imported {customers_created} customers and {payments_created} payments. Removed {deleted_customers} old customers.')
         except Exception as e:
             messages.error(request, f'Google Sheet sync failed: {str(e)}')
     return redirect('dashboard:overview')
