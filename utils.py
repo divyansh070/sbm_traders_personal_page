@@ -198,8 +198,13 @@ def calculate_features(df, credit_terms=0):
     current_date = pd.Timestamp.now().normalize()
     
     # Status Logic:
-    # In a Payments Received report, Unused Amount represents unapplied Advance Credit, not pending debt.
-    df['Payment_Status'] = np.where(df['Unused Amount'] > 1, 'Advance', 'Paid')
+    # If the payment date is missing, it's an unpaid AR Aging invoice.
+    # In a Payments Received report, Unused Amount represents unapplied Advance Credit.
+    df['Payment_Status'] = np.where(
+        df['Date'].isnull(), 
+        'Pending',
+        np.where(df['Unused Amount'] > 1, 'Advance', 'Paid')
+    )
     
     # Calculate Delay
     def get_delay(row):
@@ -359,7 +364,7 @@ def import_from_dataframe(df):
     customers_to_update = []
     
     customers_with_max_date = Customer.objects.annotate(
-        latest_payment_date=Max('payments__date')
+        latest_payment_date=Max('payments__invoice_date')
     )
     
     # Pre-load all payments into memory (1 Query total for 900-50,000 rows, fast)
