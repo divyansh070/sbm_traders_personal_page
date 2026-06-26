@@ -10,11 +10,7 @@ def dashboard_overview(request):
     with connection.cursor() as cursor:
         # Global Total Sales
         cursor.execute("""
-            SELECT SUM(amount) FROM (
-                SELECT DISTINCT customer_id, invoice_date, amount
-                FROM dashboard_app_payment
-                WHERE amount IS NOT NULL
-            ) u
+            SELECT SUM(amount) FROM dashboard_app_payment WHERE amount IS NOT NULL
         """)
         row = cursor.fetchone()
         total_amount = float(row[0] or 0)
@@ -102,21 +98,18 @@ def pending_collections(request):
 def customer_list(request):
     with connection.cursor() as cursor:
         cursor.execute("""
-            SELECT c.id, c.name, SUM(u.amount) as total_ordered, COUNT(u.amount) as order_count, c.cibil_score_v1, c.cibil_score_v2
+            SELECT c.id, c.name, SUM(p.amount) as total_ordered, COUNT(p.amount) as order_count, c.cibil_score_v1, c.cibil_score_v2, c.customer_id_str
             FROM dashboard_app_customer c
-            LEFT JOIN (
-                SELECT DISTINCT customer_id, invoice_date, amount
-                FROM dashboard_app_payment
-                WHERE amount IS NOT NULL
-            ) u ON c.id = u.customer_id
-            GROUP BY c.id, c.name, c.cibil_score_v1, c.cibil_score_v2
+            LEFT JOIN dashboard_app_payment p ON c.id = p.customer_id AND p.amount IS NOT NULL
+            GROUP BY c.id, c.name, c.cibil_score_v1, c.cibil_score_v2, c.customer_id_str
             ORDER BY total_ordered DESC NULLS LAST
         """)
         customers = []
         for row in cursor.fetchall():
             customers.append({
                 'id': row[0], 'name': row[1], 'total_ordered': float(row[2] or 0), 
-                'order_count': row[3] or 0, 'cibil_score_v1': row[4], 'cibil_score_v2': row[5]
+                'order_count': row[3] or 0, 'cibil_score_v1': row[4], 'cibil_score_v2': row[5],
+                'customer_id_str': row[6]
             })
     
     context = {
@@ -134,12 +127,9 @@ def customer_detail(request, customer_id):
     
     with connection.cursor() as cursor:
         cursor.execute("""
-            SELECT SUM(amount) FROM (
-                SELECT DISTINCT invoice_date, amount
-                FROM dashboard_app_payment
-                WHERE customer_id = %s AND amount IS NOT NULL
-            ) u
-        """, [customer_id])
+            SELECT SUM(amount) FROM dashboard_app_payment
+            WHERE customer_id = %s AND amount IS NOT NULL
+        """, [customer.id])
         row = cursor.fetchone()
         total_ordered = float(row[0] or 0)
     

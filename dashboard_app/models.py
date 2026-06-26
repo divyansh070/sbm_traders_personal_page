@@ -39,17 +39,17 @@ class Customer(models.Model):
             payments_list = list(self.payments.all())
             
         all_payments = sorted(payments_list, key=lambda p: p.date if p.date else timezone.now().date(), reverse=True)
-        late_payments = [p for p in all_payments if p.late_only_delay > 0]
-        last_5_late = late_payments[:5]
+        # Fix: Look at the last 5 payments overall, not just late payments, so reformed defaulters can recover.
+        last_5 = all_payments[:5]
         
-        if last_5_late:
-            total_late_amount = sum(float(p.amount) for p in last_5_late if p.amount)
-            if total_late_amount > 0:
+        if last_5:
+            total_amount = sum(float(p.amount) for p in last_5 if p.amount)
+            if total_amount > 0:
                 # Weighted average delay: sum(delay * amount) / sum(amount)
-                avg_delay = sum(p.late_only_delay * float(p.amount or 0) for p in last_5_late) / total_late_amount
+                avg_delay = sum(p.late_only_delay * float(p.amount or 0) for p in last_5) / total_amount
             else:
                 # Fallback to simple average if amounts are 0 or missing
-                avg_delay = sum(p.late_only_delay for p in last_5_late) / len(last_5_late)
+                avg_delay = sum(p.late_only_delay for p in last_5) / len(last_5)
         else:
             avg_delay = 0
         days_inactive = 0
@@ -78,8 +78,8 @@ class Customer(models.Model):
             payments_list = list(self.payments.all())
         
         # 1. DELAY LOGIC (Amount-Weighted Median to handle installments & outliers)
-        # We only look at payments where delay > 0 and amount > 0
-        late_payments = [p for p in payments_list if p.late_only_delay > 0 and p.amount]
+        # Fix: Ignore tiny anomalies under 100 to prevent a forgotten 10rs invoice from ruining a whale's score
+        late_payments = [p for p in payments_list if p.late_only_delay > 0 and p.amount and float(p.amount) >= 100]
         
         if late_payments:
             # Sort by delay ascending
