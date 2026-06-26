@@ -47,10 +47,10 @@ def pending_collections(request):
     with connection.cursor() as cursor:
         # Get customers with outstanding balances
         cursor.execute("""
-            SELECT c.id, c.name, SUM(p.unused_amount) as total_outstanding
+            SELECT c.id, c.name, SUM(p.amount) as total_outstanding
             FROM dashboard_app_customer c
             JOIN dashboard_app_payment p ON c.id = p.customer_id
-            WHERE p.unused_amount > 0
+            WHERE p.payment_status = 'Pending'
             GROUP BY c.id, c.name
             ORDER BY total_outstanding DESC
         """)
@@ -65,9 +65,9 @@ def pending_collections(request):
         # Get only the outstanding invoices
         if customers:
             cursor.execute("""
-                SELECT customer_id, invoice_date, date, unused_amount, delay
+                SELECT customer_id, invoice_date, date, amount, delay
                 FROM dashboard_app_payment
-                WHERE unused_amount > 0
+                WHERE payment_status = 'Pending'
                 ORDER BY invoice_date ASC NULLS LAST
             """)
             
