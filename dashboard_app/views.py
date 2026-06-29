@@ -57,7 +57,7 @@ def pending_collections(request):
             JOIN dashboard_app_payment p ON c.id = p.customer_id
             GROUP BY c.id, c.name
             HAVING (COALESCE(SUM(CASE WHEN p.payment_status = 'Pending' THEN p.amount ELSE 0 END), 0) - COALESCE(SUM(p.unused_amount), 0)) > 0
-            ORDER BY (total_debt - total_credit) DESC
+            ORDER BY (COALESCE(SUM(CASE WHEN p.payment_status = 'Pending' THEN p.amount ELSE 0 END), 0) - COALESCE(SUM(p.unused_amount), 0)) DESC
         """)
         
         customers = []
