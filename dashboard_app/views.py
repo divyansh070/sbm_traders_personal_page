@@ -45,20 +45,38 @@ def dashboard_overview(request):
 
 def pending_collections(request):
     with connection.cursor() as cursor:
-        # Get customers with outstanding balances
+        # Get customers with outstanding balances (Net Debt > 0)
+        # Net Debt = SUM(Pending Invoices) - SUM(Unused Advance Credits)
         cursor.execute("""
-            SELECT c.id, c.name, SUM(p.amount) as total_outstanding
+            SELECT 
+                c.id, 
+                c.name, 
+                COALESCE(SUM(CASE WHEN p.payment_status = 'Pending' THEN p.amount ELSE 0 END), 0) as total_debt,
+                COALESCE(SUM(p.unused_amount), 0) as total_credit
             FROM dashboard_app_customer c
             JOIN dashboard_app_payment p ON c.id = p.customer_id
-            WHERE p.payment_status = 'Pending'
             GROUP BY c.id, c.name
-            ORDER BY total_outstanding DESC
+            HAVING (COALESCE(SUM(CASE WHEN p.payment_status = 'Pending' THEN p.amount ELSE 0 END), 0) - COALESCE(SUM(p.unused_amount), 0)) > 0
+            ORDER BY (total_debt - total_credit) DESC
         """)
         
         customers = []
         customer_map = {}
         for row in cursor.fetchall():
-            c = {'id': row[0], 'name': row[1], 'total_outstanding': float(row[2] or 0), 'pending_invoices': []}
+            c_id = row[0]
+            c_name = row[1]
+            total_debt = float(row[2] or 0)
+            total_credit = float(row[3] or 0)
+            net_outstanding = total_debt - total_credit
+            
+            c = {
+                'id': c_id, 
+                'name': c_name, 
+                'total_outstanding': net_outstanding, 
+                'total_debt': total_debt,
+                'total_credit': total_credit,
+                'pending_invoices': []
+            }
             customers.append(c)
             customer_map[c['id']] = c
             
