@@ -113,6 +113,7 @@ def load_data(filepath):
         
         if rename_map:
             df_cleaned = df_cleaned.rename(columns=rename_map)
+            df_cleaned = df_cleaned.loc[:, ~df_cleaned.columns.duplicated()]
             
         return df_cleaned
     except Exception as e:
@@ -281,6 +282,7 @@ def get_processed_data_from_google_sheet(url):
         rename_map = agentic_map_columns(df_cleaned.columns)
         if rename_map:
             df_cleaned = df_cleaned.rename(columns=rename_map)
+            df_cleaned = df_cleaned.loc[:, ~df_cleaned.columns.duplicated()]
             
         if df_cleaned is not None:
             df_cleaned = clean_data(df_cleaned)
