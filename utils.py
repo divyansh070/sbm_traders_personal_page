@@ -51,7 +51,7 @@ def agentic_map_columns(excel_columns):
     
     for col in excel_cols_list:
         lower_col = str(col).lower().strip()
-        if lower_col in ['payment date', 'receipt date', 'payment_date', 'date']:
+        if lower_col in ['payment date', 'receipt date', 'payment_date', 'date', 'last payment date']:
             rename_map[col] = 'Date'
         elif lower_col in ['customer id', 'customer_id']:
             rename_map[col] = 'CustomerID'
@@ -173,6 +173,11 @@ def calculate_features(df, credit_terms=0):
         
     if 'Unused Amount' not in df.columns:
         df['Unused Amount'] = 0
+        
+    # Filter out invoices/payments that have an amount of 0 (e.g. fully paid invoices from Invoice.xlsx)
+    # This prevents double counting of fully paid invoices that are already in Payments Received.
+    df['Amount'] = pd.to_numeric(df['Amount'], errors='coerce').fillna(0)
+    df = df[df['Amount'] > 0]
         
     if 'External ID' not in df.columns:
         # Generate a synthetic external ID based on unique attributes to prevent total duplication

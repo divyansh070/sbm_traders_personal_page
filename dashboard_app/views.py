@@ -181,24 +181,37 @@ def update_customer_settings(request, customer_id):
 from utils import get_processed_data, import_from_dataframe
 
 def sync_database(request):
+    import pandas as pd
     if request.method == 'POST':
-        excel_file = request.FILES.get('excel_file')
-        if not excel_file:
-            messages.error(request, 'Please select an Excel file to upload.')
+        excel_files = request.FILES.getlist('excel_files')
+        if not excel_files:
+            messages.error(request, 'Please select at least one Excel file to upload.')
             return redirect('dashboard:overview')
             
         try:
-            df = get_processed_data(excel_file)
-            if df is None:
-                messages.error(request, 'Failed to process the uploaded file. Please ensure it is the correct format.')
+            all_dfs = []
+            for f in excel_files:
+                df = get_processed_data(f)
+                if df is not None:
+                    all_dfs.append(df)
+            
+            if not all_dfs:
+                messages.error(request, 'Failed to process the uploaded files. Please ensure they are in the correct format.')
                 return redirect('dashboard:overview')
                 
-            # Clear existing payments so the new sheet acts as the source of truth
+            # Combine all processed dataframes
+            combined_df = pd.concat(all_dfs, ignore_index=True)
+            
+            # Drop duplicates by External ID
+            if 'External ID' in combined_df.columns:
+                combined_df = combined_df.drop_duplicates(subset=['External ID'])
+                
+            # Clear existing payments so the new sheets act as the source of truth
             Payment.objects.all().delete()
                 
-            customers_created, payments_created = import_from_dataframe(df)
+            customers_created, payments_created = import_from_dataframe(combined_df)
             
-            # Delete any old customers that no longer have payments in the new sheet
+            # Delete any old customers that no longer have payments in the new sheets
             deleted_customers, _ = Customer.objects.filter(payments__isnull=True).delete()
             
             messages.success(request, f'Database synced successfully! Imported {customers_created} customers and {payments_created} payments. Removed {deleted_customers} old customers.')
