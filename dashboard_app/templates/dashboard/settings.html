@@ -23,20 +23,37 @@
             <form method="POST" action="{% url 'dashboard:global_settings' %}">
                 {% csrf_token %}
                 <div class="mb-4">
-                    <label for="google_sheet_url" class="form-label text-light">Google Sheet Public URL</label>
+                    <label for="google_sheet_url" class="form-label text-light">Payments Google Sheet Public URL</label>
                     <input type="url" class="form-control" id="google_sheet_url" name="google_sheet_url" value="{{ settings.google_sheet_url|default:'' }}" placeholder="https://docs.google.com/spreadsheets/d/...">
-                    <div class="form-text text-secondary mt-2">
-                        <strong>Instructions:</strong> Open your Google Sheet, click "Share", set general access to "Anyone with the link", and paste the link here.
+                    <div class="d-flex justify-content-between align-items-center mt-2">
+                        <div class="form-text text-secondary">
+                            <strong>Instructions:</strong> Open your Payments Google Sheet, click "Share", set access to "Anyone with the link", and paste here.
+                        </div>
+                        {% if settings.google_sheet_url %}
+                        <span class="badge bg-success bg-opacity-25 text-success border border-success p-1">✓ Configured</span>
+                        {% else %}
+                        <span class="badge bg-warning bg-opacity-25 text-warning border border-warning p-1">Not Configured</span>
+                        {% endif %}
+                    </div>
+                </div>
+
+                <div class="mb-4">
+                    <label for="invoice_google_sheet_url" class="form-label text-light">Invoices Google Sheet Public URL</label>
+                    <input type="url" class="form-control" id="invoice_google_sheet_url" name="invoice_google_sheet_url" value="{{ settings.invoice_google_sheet_url|default:'' }}" placeholder="https://docs.google.com/spreadsheets/d/...">
+                    <div class="d-flex justify-content-between align-items-center mt-2">
+                        <div class="form-text text-secondary">
+                            <strong>Instructions:</strong> Open your Invoices Google Sheet, click "Share", set access to "Anyone with the link", and paste here.
+                        </div>
+                        {% if settings.invoice_google_sheet_url %}
+                        <span class="badge bg-success bg-opacity-25 text-success border border-success p-1">✓ Configured</span>
+                        {% else %}
+                        <span class="badge bg-warning bg-opacity-25 text-warning border border-warning p-1">Not Configured</span>
+                        {% endif %}
                     </div>
                 </div>
                 
                 <div class="d-flex justify-content-between align-items-center">
                     <button type="submit" class="btn btn-primary px-4">Save Settings</button>
-                    {% if settings.google_sheet_url %}
-                    <span class="badge bg-success bg-opacity-25 text-success border border-success p-2">✓ Configured</span>
-                    {% else %}
-                    <span class="badge bg-warning bg-opacity-25 text-warning border border-warning p-2">Not Configured</span>
-                    {% endif %}
                 </div>
             </form>
         </div>

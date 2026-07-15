@@ -224,20 +224,37 @@ from utils import get_processed_data_from_google_sheet
 def sync_google_sheet(request):
     if request.method == 'POST':
         settings = SystemSettings.get_settings()
-        if not settings.google_sheet_url:
-            messages.error(request, 'No Google Sheet URL is configured. Please set it in Global Settings.')
+        if not settings.google_sheet_url and not settings.invoice_google_sheet_url:
+            messages.error(request, 'No Google Sheet URLs are configured. Please set them in Global Settings.')
             return redirect('dashboard:overview')
             
         try:
-            df = get_processed_data_from_google_sheet(settings.google_sheet_url)
-            if df is None:
-                messages.error(request, 'Failed to download or process the Google Sheet. Please check the URL and its sharing permissions.')
+            all_dfs = []
+            import pandas as pd
+            
+            if settings.google_sheet_url:
+                df_pay = get_processed_data_from_google_sheet(settings.google_sheet_url)
+                if df_pay is not None:
+                    all_dfs.append(df_pay)
+                    
+            if settings.invoice_google_sheet_url:
+                df_inv = get_processed_data_from_google_sheet(settings.invoice_google_sheet_url)
+                if df_inv is not None:
+                    all_dfs.append(df_inv)
+                    
+            if not all_dfs:
+                messages.error(request, 'Failed to download or process the Google Sheets. Please check the URLs and their sharing permissions.')
                 return redirect('dashboard:overview')
+                
+            combined_df = pd.concat(all_dfs, ignore_index=True)
+            
+            if 'External ID' in combined_df.columns:
+                combined_df = combined_df.drop_duplicates(subset=['External ID'])
                 
             # Clear existing payments so the new sheet acts as the source of truth
             Payment.objects.all().delete()
                 
-            customers_created, payments_created = import_from_dataframe(df)
+            customers_created, payments_created = import_from_dataframe(combined_df)
             
             # Delete any old customers that no longer have payments in the new sheet
             deleted_customers, _ = Customer.objects.filter(payments__isnull=True).delete()
@@ -252,8 +269,12 @@ def global_settings(request):
     
     if request.method == 'POST':
         google_sheet_url = request.POST.get('google_sheet_url', '').strip()
+        invoice_google_sheet_url = request.POST.get('invoice_google_sheet_url', '').strip()
+        
         settings.google_sheet_url = google_sheet_url
+        settings.invoice_google_sheet_url = invoice_google_sheet_url
         settings.save()
+        
         messages.success(request, 'Global settings saved successfully.')
         return redirect('dashboard:global_settings')
         

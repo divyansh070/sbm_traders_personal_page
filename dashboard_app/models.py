@@ -153,7 +153,8 @@ class SystemSettings(models.Model):
     """
     Singleton model to hold global application settings.
     """
-    google_sheet_url = models.URLField(max_length=500, blank=True, null=True, help_text="Public URL to the Google Sheet (Anyone with the link can view)")
+    google_sheet_url = models.URLField(verbose_name="Payments Google Sheet URL", max_length=500, blank=True, null=True, help_text="Public URL to the Payments Google Sheet (Anyone with the link can view)")
+    invoice_google_sheet_url = models.URLField(verbose_name="Invoices Google Sheet URL", max_length=500, blank=True, null=True, help_text="Public URL to the Invoices Google Sheet (Anyone with the link can view)")
     
     @classmethod
     def get_settings(cls):
