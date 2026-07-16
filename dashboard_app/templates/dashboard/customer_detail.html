@@ -184,7 +184,13 @@
                 <tr>
                     <td>{{ payment.date|date:"d M Y"|default:"-" }}</td>
                     <td>{{ payment.invoice_date|date:"d M Y"|default:"-" }}</td>
-                    <td>₹{{ payment.amount|floatformat:2|intcomma }}</td>
+                    <td>
+                        {% if payment.amount < 0 %}
+                        <span class="text-danger fw-bold">₹{{ payment.amount|floatformat:2|intcomma }} (Error)</span>
+                        {% else %}
+                        ₹{{ payment.amount|floatformat:2|intcomma }}
+                        {% endif %}
+                    </td>
                     <td>₹{{ payment.unused_amount|floatformat:2|intcomma }}</td>
                     <td>
                         {% if payment.payment_status == 'Paid' %}

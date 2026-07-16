@@ -42,16 +42,19 @@ class Customer(models.Model):
         # Fix: Look at the last 5 payments overall, not just late payments, so reformed defaulters can recover.
         last_5 = all_payments[:5]
         
-        if last_5:
-            total_amount = sum(float(p.amount) for p in last_5 if p.amount)
-            if total_amount > 0:
-                # Weighted average delay: sum(delay * amount) / sum(amount)
-                avg_delay = sum(p.late_only_delay * float(p.amount or 0) for p in last_5) / total_amount
-            else:
-                # Fallback to simple average if amounts are 0 or missing
-                avg_delay = sum(p.late_only_delay for p in last_5) / len(last_5)
+        # Ignore negative amounts (mistakes) and zero amounts for V1 weighting
+        valid_last_5 = [p for p in last_5 if p.amount and float(p.amount) > 0]
+        
+        if valid_last_5:
+            total_amount = sum(float(p.amount) for p in valid_last_5)
+            # Weighted average delay: sum(delay * amount) / sum(amount)
+            avg_delay = sum(p.late_only_delay * float(p.amount) for p in valid_last_5) / total_amount
         else:
-            avg_delay = 0
+            # Fallback to simple average if amounts are 0, missing, or negative
+            if last_5:
+                avg_delay = sum(p.late_only_delay for p in last_5) / len(last_5)
+            else:
+                avg_delay = 0
         days_inactive = 0
         if self.last_order_date:
             days_inactive = (timezone.now().date() - self.last_order_date).days
