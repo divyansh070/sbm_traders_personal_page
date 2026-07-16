@@ -10,11 +10,41 @@ import io
 def agentic_map_columns(excel_columns):
     """
     Asks the AI to match the uploaded Excel columns to our required database columns.
-    Uses fallback deterministic logic if API key isn't provided or call fails.
+    Optimized: Uses deterministic heuristic mapping FIRST for zero-latency.
+    Falls back to AI only if critical columns aren't found.
     """
-    required_columns = ["Date", "Invoice Date", "CustomerID", "Customer Name", "Amount", "Unused Amount", "External ID"]
     excel_cols_list = list(excel_columns)
+    rename_map = {}
     
+    # 1. Zero-Latency Heuristic Mapping First
+    has_balance = any('balance' in str(c).lower().strip() for c in excel_cols_list)
+    
+    for col in excel_cols_list:
+        lower_col = str(col).lower().strip()
+        if lower_col in ['payment date', 'receipt date', 'payment_date', 'date', 'last payment date']:
+            rename_map[col] = 'Date'
+        elif lower_col in ['customer id', 'customer_id']:
+            rename_map[col] = 'CustomerID'
+        elif lower_col in ['customer name', 'customer_name']:
+            rename_map[col] = 'Customer Name'
+        elif lower_col in ['amount', 'payment amount', 'total']:
+            if not has_balance:
+                rename_map[col] = 'Amount'
+        elif lower_col in ['unused amount', 'unused_amount']:
+            rename_map[col] = 'Unused Amount'
+        elif lower_col in ['invoice date', 'invoice_date', 'due_date', 'due date']:
+            rename_map[col] = 'Invoice Date'
+        elif lower_col in ['customerpayment id', 'entity_id', 'transaction_number', 'payment number', 'invoice id']:
+            rename_map[col] = 'External ID'
+        elif lower_col in ['balance']:
+            rename_map[col] = 'Amount'
+            
+    # Check if heuristic was successful (Found the bare minimum required columns)
+    if 'CustomerID' in rename_map.values() and 'Amount' in rename_map.values():
+        return rename_map
+
+    # 2. Fallback to AI Mapping if Heuristic failed (e.g., completely custom column names)
+    required_columns = ["Date", "Invoice Date", "CustomerID", "Customer Name", "Amount", "Unused Amount", "External ID"]
     api_key = os.environ.get("GEMINI_API_KEY")
     if api_key:
         try:
@@ -33,42 +63,18 @@ def agentic_map_columns(excel_columns):
             If an uploaded column doesn't match any required column, DO NOT include it in the dictionary.
             """
             response = model.generate_content(prompt)
-            # Find JSON block if hidden in markdown
             text = response.text.strip()
             if "```" in text:
                 text = text.split("```")[1].strip()
                 if text.startswith("json"):
                     text = text[4:].strip()
-            return json.loads(text)
+            ai_map = json.loads(text)
+            # Merge AI map over heuristic map
+            rename_map.update(ai_map)
+            return rename_map
         except Exception as e:
             print(f"Agentic mapping failed: {e}. Falling back to heuristic mapping.")
             
-    # Fallback heuristic mapping
-    rename_map = {}
-    
-    # Check if this is likely an AR Aging report (has balance)
-    has_balance = any('balance' in str(c).lower().strip() for c in excel_cols_list)
-    
-    for col in excel_cols_list:
-        lower_col = str(col).lower().strip()
-        if lower_col in ['payment date', 'receipt date', 'payment_date', 'date', 'last payment date']:
-            rename_map[col] = 'Date'
-        elif lower_col in ['customer id', 'customer_id']:
-            rename_map[col] = 'CustomerID'
-        elif lower_col in ['customer name', 'customer_name']:
-            rename_map[col] = 'Customer Name'
-        elif lower_col in ['amount', 'payment amount']:
-            # If it's an AR aging report, ignore the total 'amount' and use 'balance' instead
-            if not has_balance:
-                rename_map[col] = 'Amount'
-        elif lower_col in ['unused amount', 'unused_amount']:
-            rename_map[col] = 'Unused Amount'
-        elif lower_col in ['invoice date', 'invoice_date', 'due_date', 'due date']:
-            rename_map[col] = 'Invoice Date'
-        elif lower_col in ['customerpayment id', 'entity_id', 'transaction_number', 'payment number']:
-            rename_map[col] = 'External ID'
-        elif lower_col in ['balance']:
-            rename_map[col] = 'Amount'
     return rename_map
 
 def load_data(filepath):
