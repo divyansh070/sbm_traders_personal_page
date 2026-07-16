@@ -1,4 +1,5 @@
 {% extends 'dashboard/base.html' %}
+{% load humanize %}
 
 {% block title %}All Customers - SBM Traders{% endblock %}
 
@@ -8,8 +9,13 @@
         <h1 class="fw-bold text-gradient">All Customers</h1>
         <p class="text-secondary mb-0">Ranked by total order amount.</p>
     </div>
-    <div class="col-md-4 mt-3 mt-md-0">
-        <input type="text" id="customerSearch" class="form-control" placeholder="Search by name or ID...">
+    <div class="col-md-4 mt-3 mt-md-0 position-relative">
+        <div class="input-group">
+            <span class="input-group-text bg-dark border-secondary border-end-0">
+                <i data-lucide="search" class="text-secondary" style="width: 18px; height: 18px;"></i>
+            </span>
+            <input type="text" id="customerSearch" class="form-control bg-dark text-light border-secondary border-start-0" placeholder="Search by name or ID..." style="box-shadow: none;">
+        </div>
     </div>
 </div>
 
@@ -62,13 +68,14 @@
                         {% endif %}
                     </td>
                     <td class="text-center">{{ customer.order_count }}</td>
-                    <td class="text-end">₹{{ customer.total_ordered|floatformat:2 }}</td>
+                    <td class="text-end">₹{{ customer.total_ordered|floatformat:2|intcomma }}</td>
                 </tr>
                 {% endfor %}
             </tbody>
         </table>
     </div>
 </div>
+{% endblock %}
 
 {% block extra_js %}
 <script>
@@ -143,5 +150,4 @@
         background-color: rgba(255, 255, 255, 0.05) !important;
     }
 </style>
-{% endblock %}
 {% endblock %}
