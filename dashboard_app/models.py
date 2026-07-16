@@ -38,28 +38,25 @@ class Customer(models.Model):
         if payments_list is None:
             payments_list = list(self.payments.all())
             
-        all_payments = sorted(payments_list, key=lambda p: p.date if p.date else timezone.now().date(), reverse=True)
+        # Completely strip out negative amounts (errors) and zero amounts for calculations
+        valid_payments = [p for p in payments_list if p.amount and float(p.amount) > 0]
+            
+        all_payments = sorted(valid_payments, key=lambda p: p.date if p.date else timezone.now().date(), reverse=True)
         # Fix: Look at the last 5 payments overall, not just late payments, so reformed defaulters can recover.
         last_5 = all_payments[:5]
         
-        # Ignore negative amounts (mistakes) and zero amounts for V1 weighting
-        valid_last_5 = [p for p in last_5 if p.amount and float(p.amount) > 0]
-        
-        if valid_last_5:
-            total_amount = sum(float(p.amount) for p in valid_last_5)
+        if last_5:
+            total_amount = sum(float(p.amount) for p in last_5)
             # Weighted average delay: sum(delay * amount) / sum(amount)
-            avg_delay = sum(p.late_only_delay * float(p.amount) for p in valid_last_5) / total_amount
+            avg_delay = sum(p.late_only_delay * float(p.amount) for p in last_5) / total_amount
         else:
-            # Fallback to simple average if amounts are 0, missing, or negative
-            if last_5:
-                avg_delay = sum(p.late_only_delay for p in last_5) / len(last_5)
-            else:
-                avg_delay = 0
+            avg_delay = 0
+            
         days_inactive = 0
         if self.last_order_date:
             days_inactive = (timezone.now().date() - self.last_order_date).days
         else:
-            days_inactive = 365
+            days_inactive = 0 # No valid orders means no inactivity penalty
                 
         penalty = (avg_delay * self.delay_weight_v1) + (days_inactive * self.inactivity_weight_v1)
             
@@ -79,10 +76,13 @@ class Customer(models.Model):
         
         if payments_list is None:
             payments_list = list(self.payments.all())
+            
+        # Completely strip out negative amounts (errors) and zero amounts for calculations
+        valid_payments = [p for p in payments_list if p.amount and float(p.amount) > 0]
         
         # 1. DELAY LOGIC (Amount-Weighted Median to handle installments & outliers)
         # Fix: Ignore tiny anomalies under 100 to prevent a forgotten 10rs invoice from ruining a whale's score
-        late_payments = [p for p in payments_list if p.late_only_delay > 0 and p.amount and float(p.amount) >= 100]
+        late_payments = [p for p in valid_payments if p.late_only_delay > 0 and float(p.amount) >= 100]
         
         if late_payments:
             # Sort by delay ascending
@@ -112,8 +112,8 @@ class Customer(models.Model):
         # 2. VOLUME BONUS (Log Scale)
         unique_invoices = set()
         total_sales = 0
-        for p in payments_list:
-            if p.amount and (p.invoice_date, p.amount) not in unique_invoices:
+        for p in valid_payments:
+            if (p.invoice_date, p.amount) not in unique_invoices:
                 unique_invoices.add((p.invoice_date, p.amount))
                 total_sales += float(p.amount)
                 
@@ -126,7 +126,7 @@ class Customer(models.Model):
         if self.last_order_date:
             days_since_last = (timezone.now().date() - self.last_order_date).days
         else:
-            days_since_last = 365
+            days_since_last = 0 # No valid orders means no inactivity penalty
             
         if days_since_last > self.v2_decay_start_days:
             decay_penalty = (days_since_last - self.v2_decay_start_days) * self.v2_decay_penalty_mult

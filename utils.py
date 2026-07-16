@@ -381,10 +381,6 @@ def import_from_dataframe(df):
     # 4. Recalculate CIBIL for all customers footprint-efficiently
     customers_to_update = []
     
-    customers_with_max_date = Customer.objects.annotate(
-        latest_payment_date=Max('payments__invoice_date')
-    )
-    
     # Pre-load all payments into memory (1 Query total for 900-50,000 rows, fast)
     from collections import defaultdict
     all_payments = Payment.objects.all()
@@ -392,12 +388,16 @@ def import_from_dataframe(df):
     for p in all_payments:
         payments_by_customer[p.customer_id].append(p)
     
-    for customer in customers_with_max_date:
-        if customer.latest_payment_date:
-            customer.last_order_date = customer.latest_payment_date
-        
+    for customer in Customer.objects.filter(customer_id_str__in=customer_ids):
         # Calculate scores completely in-memory (0 database roundtrips)
         cust_payments = payments_by_customer.get(customer.id, [])
+        
+        # Calculate last order date ignoring errors (amount <= 0)
+        valid_dates = [p.invoice_date for p in cust_payments if p.amount and float(p.amount) > 0 and p.invoice_date]
+        if valid_dates:
+            customer.last_order_date = max(valid_dates)
+        else:
+            customer.last_order_date = None
         customer.calculate_cibil_v1(save=False, payments_list=cust_payments)
         customer.calculate_cibil_v2(save=False, payments_list=cust_payments)
         customers_to_update.append(customer)

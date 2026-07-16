@@ -151,7 +151,7 @@ def customer_detail(request, customer_id):
     with connection.cursor() as cursor:
         cursor.execute("""
             SELECT SUM(amount) FROM dashboard_app_payment
-            WHERE customer_id = %s AND amount IS NOT NULL
+            WHERE customer_id = %s AND amount IS NOT NULL AND amount > 0
         """, [customer.id])
         row = cursor.fetchone()
         total_ordered = float(row[0] or 0)
