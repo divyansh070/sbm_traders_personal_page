@@ -1,4 +1,5 @@
 {% extends 'dashboard/base.html' %}
+{% load humanize %}
 
 {% block title %}Dashboard Overview - SBM Traders{% endblock %}
 
@@ -14,13 +15,13 @@
     <div class="col-md-4">
         <div class="card metric-card">
             <div class="metric-label">Total Payment Received</div>
-            <div class="metric-value">₹{{ total_amount|floatformat:2 }}</div>
+            <div class="metric-value">₹{{ total_amount|floatformat:2|intcomma }}</div>
         </div>
     </div>
     <div class="col-md-4">
         <div class="card metric-card">
             <div class="metric-label">Total Outstanding Amount</div>
-            <div class="metric-value">₹{{ total_unused|floatformat:2 }}</div>
+            <div class="metric-value">₹{{ total_unused|floatformat:2|intcomma }}</div>
         </div>
     </div>
     <div class="col-md-4">
@@ -52,11 +53,18 @@
                             <td>
                                 <a href="{% url 'dashboard:customer_detail' customer.id %}">{{ customer.name }}</a>
                             </td>
-                            <td class="text-end">₹{{ customer.total_payment|floatformat:2 }}</td>
+                            <td class="text-end">₹{{ customer.total_payment|floatformat:2|intcomma }}</td>
                         </tr>
                         {% endfor %}
                     </tbody>
                 </table>
+            </div>
+        </div>
+
+        <div class="glass-panel mt-4 p-4">
+            <h4 class="mb-4">Collection Overview</h4>
+            <div style="height: 300px; display: flex; justify-content: center; align-items: center;">
+                <canvas id="collectionChart"></canvas>
             </div>
         </div>
     </div>
@@ -135,6 +143,16 @@
     {% endfor %}
 </div>
 {% endif %}
+
+<!-- Full Screen Sync Overlay -->
+<div id="fullScreenOverlay" style="display: none; position: fixed; top: 0; left: 0; width: 100vw; height: 100vh; background: rgba(0, 0, 0, 0.85); backdrop-filter: blur(10px); -webkit-backdrop-filter: blur(10px); z-index: 9999; flex-direction: column; justify-content: center; align-items: center;">
+    <div class="spinner-border text-info" role="status" style="width: 4rem; height: 4rem; margin-bottom: 1rem;">
+        <span class="visually-hidden">Loading...</span>
+    </div>
+    <h2 class="text-gradient fw-bold">Syncing Data...</h2>
+    <p class="text-secondary mt-2">Processing invoices, payments, and calculating CIBIL scores.</p>
+</div>
+
 {% endblock %}
 
 {% block extra_css %}
@@ -155,19 +173,18 @@
 {% endblock %}
 
 {% block extra_js %}
+<script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
 <script>
+    function showOverlay() {
+        document.getElementById('fullScreenOverlay').style.display = 'flex';
+    }
+
     document.getElementById('googleSyncForm').addEventListener('submit', function () {
-        document.getElementById('googleSyncBtn').disabled = true;
-        document.getElementById('googleSyncText').textContent = 'Syncing...';
-        document.getElementById('googleSyncSpinner').style.display = 'inline-block';
-        document.getElementById('googleSyncIcon').style.display = 'none';
+        showOverlay();
     });
 
     document.getElementById('excelSyncForm').addEventListener('submit', function () {
-        document.getElementById('excelSyncBtn').disabled = true;
-        document.getElementById('excelSyncText').textContent = 'Uploading...';
-        document.getElementById('excelSyncSpinner').style.display = 'inline-block';
-        document.getElementById('excelSyncIcon').style.display = 'none';
+        showOverlay();
     });
 
     // Auto-dismiss toasts after 5 seconds
@@ -176,5 +193,48 @@
             new bootstrap.Toast(toast, { delay: 500 }).hide();
         });
     }, 5000);
+
+    // Chart.js Configuration
+    const ctx = document.getElementById('collectionChart').getContext('2d');
+    
+    // Fallback safe rendering of values
+    const totalCollected = parseFloat("{{ total_collected|default:'0' }}");
+    const totalDebt = parseFloat("{{ total_debt_value|default:'0' }}");
+    
+    new Chart(ctx, {
+        type: 'doughnut',
+        data: {
+            labels: ['Total Collected', 'Total Outstanding'],
+            datasets: [{
+                data: [totalCollected, totalDebt],
+                backgroundColor: [
+                    'rgba(0, 240, 255, 0.8)', // Cyan
+                    'rgba(255, 0, 85, 0.8)'   // Pink/Red for debt
+                ],
+                borderColor: [
+                    'rgba(0, 240, 255, 1)',
+                    'rgba(255, 0, 85, 1)'
+                ],
+                borderWidth: 1,
+                hoverOffset: 4
+            }]
+        },
+        options: {
+            responsive: true,
+            maintainAspectRatio: false,
+            plugins: {
+                legend: {
+                    position: 'bottom',
+                    labels: {
+                        color: '#ffffff',
+                        font: {
+                            family: "'Inter', sans-serif",
+                            size: 14
+                        }
+                    }
+                }
+            }
+        }
+    });
 </script>
 {% endblock %}

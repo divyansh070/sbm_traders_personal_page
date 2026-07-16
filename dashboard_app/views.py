@@ -32,12 +32,17 @@ def dashboard_overview(request):
         for row in cursor.fetchall():
             top_customers.append({'id': row[0], 'name': row[1], 'total_payment': float(row[2] or 0)})
             
-    total_unused = Payment.objects.aggregate(Sum('unused_amount'))['unused_amount__sum'] or 0
+    total_credit = Payment.objects.aggregate(Sum('unused_amount'))['unused_amount__sum'] or 0
+    total_debt = Payment.objects.filter(payment_status='Pending').aggregate(Sum('amount'))['amount__sum'] or 0
+    net_outstanding = max(total_debt - total_credit, 0)
+    
     avg_delay = Payment.objects.filter(late_only_delay__gt=0).aggregate(Avg('late_only_delay'))['late_only_delay__avg'] or 0
     
     context = {
         'total_amount': total_amount,
-        'total_unused': total_unused,
+        'total_unused': net_outstanding, # Renamed internally to mean net outstanding debt
+        'total_collected': total_amount,
+        'total_debt_value': net_outstanding,
         'avg_delay': avg_delay,
         'top_customers': top_customers,
     }
