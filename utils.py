@@ -7,16 +7,15 @@ import re
 import requests
 import io
 
-def agentic_map_columns(excel_columns):
+def map_columns(excel_columns):
     """
-    Asks the AI to match the uploaded Excel columns to our required database columns.
-    Optimized: Uses deterministic heuristic mapping FIRST for zero-latency.
-    Falls back to AI only if critical columns aren't found.
+    Uses deterministic heuristic mapping for zero-latency.
+    Matches standard Excel columns to our required database columns.
     """
     excel_cols_list = list(excel_columns)
     rename_map = {}
     
-    # 1. Zero-Latency Heuristic Mapping First
+    # 1. Zero-Latency Heuristic Mapping
     has_balance = any('balance' in str(c).lower().strip() for c in excel_cols_list)
     
     for col in excel_cols_list:
@@ -38,42 +37,6 @@ def agentic_map_columns(excel_columns):
             rename_map[col] = 'External ID'
         elif lower_col in ['balance']:
             rename_map[col] = 'Amount'
-            
-    # Check if heuristic was successful (Found the bare minimum required columns)
-    if 'CustomerID' in rename_map.values() and 'Amount' in rename_map.values():
-        return rename_map
-
-    # 2. Fallback to AI Mapping if Heuristic failed (e.g., completely custom column names)
-    required_columns = ["Date", "Invoice Date", "CustomerID", "Customer Name", "Amount", "Unused Amount", "External ID"]
-    api_key = os.environ.get("GEMINI_API_KEY")
-    if api_key:
-        try:
-            import google.generativeai as genai
-            genai.configure(api_key=api_key)
-            model = genai.GenerativeModel('gemini-1.5-flash')
-            
-            prompt = f"""
-            You are a data pipeline assistant. 
-            Match the following uploaded Excel columns to our system's required columns.
-            
-            Uploaded Columns: {excel_cols_list}
-            Required System Columns: {required_columns}
-            
-            Return ONLY a valid JSON dictionary where the keys are the Uploaded Columns and the values are the Required System Columns. 
-            If an uploaded column doesn't match any required column, DO NOT include it in the dictionary.
-            """
-            response = model.generate_content(prompt)
-            text = response.text.strip()
-            if "```" in text:
-                text = text.split("```")[1].strip()
-                if text.startswith("json"):
-                    text = text[4:].strip()
-            ai_map = json.loads(text)
-            # Merge AI map over heuristic map
-            rename_map.update(ai_map)
-            return rename_map
-        except Exception as e:
-            print(f"Agentic mapping failed: {e}. Falling back to heuristic mapping.")
             
     return rename_map
 
@@ -113,9 +76,7 @@ def load_data(filepath):
         #         rename_map[col] = 'Amount'
         #     elif lower_col in ['unused amount', 'unused_amount']:
         #         rename_map[col] = 'Unused Amount'
-        #     elif lower_col in ['invoice date', 'invoice_date']:
-        #         rename_map[col] = 'Invoice Date'
-        rename_map = agentic_map_columns(df_cleaned.columns)
+        rename_map = map_columns(df_cleaned.columns)
         
         if rename_map:
             df_cleaned = df_cleaned.rename(columns=rename_map)
@@ -296,7 +257,7 @@ def get_processed_data_from_google_sheet(url):
         df_cleaned = df.dropna(axis=1, how='all')
         df_cleaned.columns = df_cleaned.columns.astype(str).str.strip()
         
-        rename_map = agentic_map_columns(df_cleaned.columns)
+        rename_map = map_columns(df_cleaned.columns)
         if rename_map:
             df_cleaned = df_cleaned.rename(columns=rename_map)
             df_cleaned = df_cleaned.loc[:, ~df_cleaned.columns.duplicated()]
