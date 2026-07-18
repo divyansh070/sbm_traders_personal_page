@@ -19,21 +19,22 @@ def map_columns(excel_columns):
     has_balance = any('balance' in str(c).lower().strip() for c in excel_cols_list)
     
     for col in excel_cols_list:
-        lower_col = str(col).lower().strip()
-        if lower_col in ['payment date', 'receipt date', 'payment_date', 'date', 'last payment date']:
+        lower_col = str(col).lower().replace(' ', '').replace('_', '').strip()
+        
+        if lower_col in ['paymentdate', 'receiptdate', 'date', 'lastpaymentdate']:
             rename_map[col] = 'Date'
-        elif lower_col in ['customer id', 'customer_id']:
+        elif lower_col in ['customerid']:
             rename_map[col] = 'CustomerID'
-        elif lower_col in ['customer name', 'customer_name']:
+        elif lower_col in ['customername']:
             rename_map[col] = 'Customer Name'
-        elif lower_col in ['amount', 'payment amount', 'total']:
+        elif lower_col in ['amount', 'paymentamount', 'total']:
             if not has_balance:
                 rename_map[col] = 'Amount'
-        elif lower_col in ['unused amount', 'unused_amount']:
+        elif lower_col in ['unusedamount']:
             rename_map[col] = 'Unused Amount'
-        elif lower_col in ['invoice date', 'invoice_date', 'due_date', 'due date']:
+        elif lower_col in ['invoicedate', 'duedate']:
             rename_map[col] = 'Invoice Date'
-        elif lower_col in ['customerpayment id', 'entity_id', 'transaction_number', 'payment number', 'invoice id']:
+        elif lower_col in ['customerpaymentid', 'entityid', 'transactionnumber', 'paymentnumber']:
             rename_map[col] = 'External ID'
         elif lower_col in ['balance']:
             rename_map[col] = 'Amount'
