@@ -173,6 +173,7 @@
                 <tr>
                     <th>Date</th>
                     <th>Invoice Date</th>
+                    <th>Invoice/Payment ID</th>
                     <th>Amount</th>
                     <th>Unused</th>
                     <th>Status</th>
@@ -184,6 +185,7 @@
                 <tr>
                     <td>{{ payment.date|date:"d M Y"|default:"-" }}</td>
                     <td>{{ payment.invoice_date|date:"d M Y"|default:"-" }}</td>
+                    <td class="text-secondary font-monospace small">{{ payment.external_id|default:"-" }}</td>
                     <td>
                         {% if payment.amount < 0 %}
                         <span class="text-danger fw-bold">₹{{ payment.amount|floatformat:2|intcomma }} (Error)</span>
