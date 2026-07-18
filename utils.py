@@ -34,6 +34,8 @@ def map_columns(excel_columns):
             rename_map[col] = 'Unused Amount'
         elif lower_col in ['invoicedate', 'duedate']:
             rename_map[col] = 'Invoice Date'
+        elif lower_col in ['invoiceid', 'invoicenumber']:
+            rename_map[col] = 'Invoice ID'
         elif lower_col in ['customerpaymentid', 'entityid', 'transactionnumber', 'paymentnumber']:
             rename_map[col] = 'External ID'
         elif lower_col in ['balance']:
@@ -160,8 +162,11 @@ def calculate_features(df, credit_terms=0):
         df = df[df['Amount'] != 0]
         
     if 'External ID' not in df.columns:
-        # Generate a synthetic external ID based on unique attributes to prevent total duplication
-        df['External ID'] = df.apply(lambda row: f"{row.get('CustomerID', 'unknown')}_{row.get('Invoice Date', 'unknown')}_{row.get('Amount', 0)}_{hash(str(row))}", axis=1)
+        if 'Invoice ID' in df.columns:
+            df['External ID'] = df['Invoice ID']
+        else:
+            # Generate a synthetic external ID based on unique attributes to prevent total duplication
+            df['External ID'] = df['CustomerID'].astype(str) + "_" + df['Date'].astype(str) + "_" + df['Amount'].astype(str)
 
     # Create copy to avoid SettingWithCopyWarning
     df = df.copy()
