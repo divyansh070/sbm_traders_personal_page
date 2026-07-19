@@ -12,19 +12,25 @@
 </div>
 
 <div class="row g-4 mb-5 fade-in-up" style="animation-delay: 0.1s;">
-    <div class="col-md-4">
+    <div class="col-md-3">
         <div class="card metric-card">
-            <div class="metric-label">Total Payment Received</div>
+            <div class="metric-label">Lifetime Total Ordered</div>
             <div class="metric-value">₹{{ total_amount|floatformat:2|intcomma }}</div>
         </div>
     </div>
-    <div class="col-md-4">
+    <div class="col-md-3">
+        <div class="card metric-card">
+            <div class="metric-label">Total Payment Received</div>
+            <div class="metric-value">₹{{ total_collected|floatformat:2|intcomma }}</div>
+        </div>
+    </div>
+    <div class="col-md-3">
         <div class="card metric-card">
             <div class="metric-label">Total Outstanding Amount</div>
             <div class="metric-value">₹{{ total_unused|floatformat:2|intcomma }}</div>
         </div>
     </div>
-    <div class="col-md-4">
+    <div class="col-md-3">
         <div class="card metric-card">
             <div class="metric-label">Avg Delay (Late Payments)</div>
             <div class="metric-value">{{ avg_delay|floatformat:1 }} Days</div>
