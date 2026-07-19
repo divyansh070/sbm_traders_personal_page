@@ -8,12 +8,20 @@ from django.db import connection
 
 def dashboard_overview(request):
     with connection.cursor() as cursor:
-        # Global Total Sales
+        # Global Total Ordered
         cursor.execute("""
             SELECT SUM(amount) FROM dashboard_app_payment WHERE amount IS NOT NULL
         """)
         row = cursor.fetchone()
-        total_amount = float(row[0] or 0)
+        total_ordered_amount = float(row[0] or 0)
+        
+        # Global Total Collected (Payments Only)
+        cursor.execute("""
+            SELECT SUM(amount) FROM dashboard_app_payment 
+            WHERE amount IS NOT NULL AND payment_status != 'Pending'
+        """)
+        row = cursor.fetchone()
+        total_collected_amount = float(row[0] or 0)
         
         # Top 10 Customers
         cursor.execute("""
@@ -39,9 +47,9 @@ def dashboard_overview(request):
     avg_delay = Payment.objects.filter(late_only_delay__gt=0).aggregate(Avg('late_only_delay'))['late_only_delay__avg'] or 0
     
     context = {
-        'total_amount': total_amount,
+        'total_amount': total_ordered_amount,
         'total_unused': net_outstanding, # Renamed internally to mean net outstanding debt
-        'total_collected': total_amount,
+        'total_collected': total_collected_amount,
         'total_debt_value': net_outstanding,
         'avg_delay': avg_delay,
         'top_customers': top_customers,
@@ -155,11 +163,19 @@ def customer_detail(request, customer_id):
         """, [customer.id])
         row = cursor.fetchone()
         total_ordered = float(row[0] or 0)
+        
+        cursor.execute("""
+            SELECT SUM(amount) FROM dashboard_app_payment
+            WHERE customer_id = %s AND amount IS NOT NULL AND amount > 0 AND payment_status != 'Pending'
+        """, [customer.id])
+        row = cursor.fetchone()
+        total_collected = float(row[0] or 0)
     
     context = {
         'customer': customer,
         'payments': payments,
-        'total_ordered': total_ordered
+        'total_ordered': total_ordered,
+        'total_collected': total_collected
     }
     return render(request, 'dashboard/customer_detail.html', context)
 
