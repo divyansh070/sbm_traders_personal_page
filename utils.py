@@ -154,12 +154,16 @@ def calculate_features(df, credit_terms=0):
     if has_external_id:
         # It's a payment file. Keep everything except maybe nulls, but we already filled na with 0.
         # We keep 0 (e.g. CUST-016) and negative (Refunds, e.g. CUST-011).
-        pass
+        
+        # FIX: If a single payment was split across multiple invoices, 'External ID' is duplicated.
+        # Append 'Invoice Number' to make each split payment row unique.
+        if 'Invoice Number' in df.columns:
+            df['External ID'] = df['External ID'].astype(str) + '_' + df['Invoice Number'].astype(str).fillna('unapplied')
     else:
-        # It's an invoice file. Drop Amount == 0 to prevent double counting fully paid invoices, 
-        # and to ignore dummy zero-dollar invoices (e.g. CUST-015).
-        # We KEEP negative amounts (Refunds).
-        df = df[df['Amount'] != 0]
+        # It's an invoice file. 
+        # We keep Amount == 0 here so that we can deduplicate overlapping AR Aging sheets in views.py.
+        # It will be dropped in views.py AFTER cross-file deduplication.
+        pass
         
     if 'External ID' not in df.columns:
         if 'Invoice ID' in df.columns:

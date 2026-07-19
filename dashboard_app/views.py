@@ -207,9 +207,17 @@ def sync_database(request):
             # Combine all processed dataframes
             combined_df = pd.concat(all_dfs, ignore_index=True)
             
+            # Sort by Amount so that the lowest balance (most recent) comes first
+            if 'Amount' in combined_df.columns:
+                combined_df = combined_df.sort_values('Amount')
+            
             # Drop duplicates by External ID
             if 'External ID' in combined_df.columns:
-                combined_df = combined_df.drop_duplicates(subset=['External ID'])
+                combined_df = combined_df.drop_duplicates(subset=['External ID'], keep='first')
+                
+            # Now drop Amount == 0 for Pending invoices (fully paid invoices from AR Aging)
+            if 'Payment_Status' in combined_df.columns and 'Amount' in combined_df.columns:
+                combined_df = combined_df[~((combined_df['Payment_Status'] == 'Pending') & (combined_df['Amount'] == 0))]
                 
             # Clear existing payments so the new sheets act as the source of truth
             Payment.objects.all().delete()
