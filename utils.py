@@ -200,6 +200,13 @@ def calculate_features(df, credit_terms=0):
         np.where(df['Unused Amount'] > 1, 'Advance', 'Paid')
     )
     
+    if not has_external_id:
+        # AR Aging files represent purely pending debt.
+        # Even if they have a 'Last Payment Date', the remaining balance is STILL pending.
+        df['Payment_Status'] = 'Pending'
+        # Clear the Date so that the delay for the remaining balance accrues up to today.
+        df['Date'] = pd.NaT
+    
     # Calculate Delay
     def get_delay(row):
         p_date = row.get('Date')
