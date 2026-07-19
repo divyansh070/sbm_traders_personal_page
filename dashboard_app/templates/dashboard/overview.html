@@ -13,27 +13,27 @@
 
 <div class="row g-4 mb-5 fade-in-up" style="animation-delay: 0.1s;">
     <div class="col-md-3">
-        <div class="card metric-card">
+        <div class="card metric-card h-100">
             <div class="metric-label">Lifetime Total Ordered</div>
-            <div class="metric-value">₹{{ total_amount|floatformat:2|intcomma }}</div>
+            <div class="metric-value" style="font-size: 1.8rem; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;">₹{{ total_amount|floatformat:2|intcomma }}</div>
         </div>
     </div>
     <div class="col-md-3">
-        <div class="card metric-card">
+        <div class="card metric-card h-100">
             <div class="metric-label">Total Payment Received</div>
-            <div class="metric-value">₹{{ total_collected|floatformat:2|intcomma }}</div>
+            <div class="metric-value" style="font-size: 1.8rem; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;">₹{{ total_collected|floatformat:2|intcomma }}</div>
         </div>
     </div>
     <div class="col-md-3">
-        <div class="card metric-card">
+        <div class="card metric-card h-100">
             <div class="metric-label">Total Outstanding Amount</div>
-            <div class="metric-value">₹{{ total_unused|floatformat:2|intcomma }}</div>
+            <div class="metric-value" style="font-size: 1.8rem; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;">₹{{ total_unused|floatformat:2|intcomma }}</div>
         </div>
     </div>
     <div class="col-md-3">
-        <div class="card metric-card">
+        <div class="card metric-card h-100">
             <div class="metric-label">Avg Delay (Late Payments)</div>
-            <div class="metric-value">{{ avg_delay|floatformat:1 }} Days</div>
+            <div class="metric-value" style="font-size: 1.8rem; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;">{{ avg_delay|floatformat:1 }} Days</div>
         </div>
     </div>
 </div>
