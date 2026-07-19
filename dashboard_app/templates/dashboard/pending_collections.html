@@ -18,7 +18,12 @@
                     <thead>
                         <tr>
                             <th>Customer Name</th>
-                            <th>Total Outstanding</th>
+                            <th class="sortable-col" onclick="sortTable(1, 'curr')">
+                                <div class="d-flex align-items-center gap-2">
+                                    <span class="text-uppercase" style="font-size: 0.75rem; letter-spacing: 1px;">Total Outstanding</span>
+                                    <span class="sort-icon text-secondary" style="font-size: 0.9rem;">↕</span>
+                                </div>
+                            </th>
                             <th>Pending Invoices</th>
                             <th class="text-end">Actions</th>
                         </tr>
@@ -64,4 +69,65 @@
         </div>
     </div>
 </div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+    let sortDirections = [true, true, true, true];
+
+    function sortTable(colIndex, type) {
+        let table = document.querySelector(".table tbody");
+        let rows = Array.from(table.querySelectorAll("tr"));
+        let direction = sortDirections[colIndex] ? 1 : -1;
+        sortDirections[colIndex] = !sortDirections[colIndex];
+
+        // Reset all icons to ↕
+        document.querySelectorAll('.sort-icon').forEach(icon => {
+            icon.textContent = '↕';
+            icon.classList.replace('text-info', 'text-secondary');
+        });
+
+        // Set the active icon
+        let ths = document.querySelectorAll('.table thead th');
+        let activeIcon = ths[colIndex].querySelector('.sort-icon');
+        if(activeIcon) {
+            activeIcon.textContent = direction === 1 ? '↓' : '↑';
+            activeIcon.classList.replace('text-secondary', 'text-info');
+        }
+
+        rows.sort((a, b) => {
+            // Ignore empty row
+            if (a.cells.length < 4) return 0;
+            if (b.cells.length < 4) return 0;
+            
+            let valA = a.cells[colIndex].textContent.trim();
+            let valB = b.cells[colIndex].textContent.trim();
+
+            if (type === 'curr') {
+                valA = parseFloat(valA.replace(/[^0-9.-]+/g, "")) || 0;
+                valB = parseFloat(valB.replace(/[^0-9.-]+/g, "")) || 0;
+            } else if (type === 'num') {
+                valA = parseFloat(valA) || 0;
+                valB = parseFloat(valB) || 0;
+            }
+
+            if (valA < valB) return -1 * direction;
+            if (valA > valB) return 1 * direction;
+            return 0;
+        });
+
+        rows.forEach(row => table.appendChild(row));
+    }
+</script>
+<style>
+    .sortable-col {
+        cursor: pointer;
+        user-select: none;
+        transition: background-color 0.2s;
+    }
+
+    .sortable-col:hover {
+        background-color: rgba(255, 255, 255, 0.05) !important;
+    }
+</style>
 {% endblock %}
