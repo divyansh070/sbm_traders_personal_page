@@ -39,7 +39,7 @@
                                 {% for inv in customer.pending_invoices %}
                                     <li class="text-secondary small mb-1">
                                         {% if inv.invoice_date %}{{ inv.invoice_date|date:"d M Y" }}{% else %}No Date{% endif %}
-                                        <span class="text-muted ms-2">(Delay: {% if inv.ongoing_delay > 0 %}<span class="text-warning fw-bold">{{ inv.ongoing_delay }} days</span>{% else %}{{ inv.ongoing_delay }} days{% endif %})</span>
+                                        <span class="text-muted ms-2">(Delay: {% if inv.delay > 0 %}<span class="text-warning fw-bold">{{ inv.delay }} days</span>{% else %}{{ inv.delay }} days{% endif %})</span>
                                     </li>
                                 {% endfor %}
                                 </ul>

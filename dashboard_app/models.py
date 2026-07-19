@@ -149,8 +149,15 @@ class Payment(models.Model):
     late_only_delay = models.IntegerField(default=0)
     external_id = models.CharField(max_length=255, unique=True, null=True, blank=True)
     
+    @property
+    def display_id(self):
+        if self.external_id and '_' in self.external_id:
+            parts = self.external_id.split('_', 1)
+            return f"Pay: {parts[0]} | Inv: {parts[1]}"
+        return self.external_id
+
     def __str__(self):
-        return f"{self.customer.name} - {self.amount} ({self.payment_status})"
+        return f"{self.customer.name} - {self.display_id or self.amount} ({self.payment_status})"
 
 class SystemSettings(models.Model):
     """
