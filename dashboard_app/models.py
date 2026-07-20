@@ -165,6 +165,7 @@ class SystemSettings(models.Model):
     """
     google_sheet_url = models.URLField(verbose_name="Payments Google Sheet URL", max_length=500, blank=True, null=True, help_text="Public URL to the Payments Google Sheet (Anyone with the link can view)")
     invoice_google_sheet_url = models.URLField(verbose_name="Invoices Google Sheet URL", max_length=500, blank=True, null=True, help_text="Public URL to the Invoices Google Sheet (Anyone with the link can view)")
+    delay_bucket_thresholds = models.CharField(verbose_name="Delay Bucket Thresholds", max_length=100, default="5, 15, 30, 60", help_text="Comma-separated list of days for delay buckets. Example: 5, 15, 30, 60")
     
     @classmethod
     def get_settings(cls):

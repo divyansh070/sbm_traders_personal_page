@@ -67,22 +67,24 @@
             </div>
         </div>
 
-        <div class="row mt-4">
-            <div class="col-md-6">
-                <div class="glass-panel p-4 h-100">
-                    <h4 class="mb-4">Collection Overview</h4>
-                    <div style="height: 300px; display: flex; justify-content: center; align-items: center;">
-                        <canvas id="collectionChart"></canvas>
-                    </div>
-                </div>
+        <div class="glass-panel mt-4 p-4">
+            <h4 class="mb-4">Collection Overview</h4>
+            <div style="height: 300px; display: flex; justify-content: center; align-items: center;">
+                <canvas id="collectionChart"></canvas>
             </div>
-            <div class="col-md-6">
-                <div class="glass-panel p-4 h-100">
-                    <h4 class="mb-4">Pending Invoice Delays</h4>
-                    <div style="height: 300px; display: flex; justify-content: center; align-items: center;">
-                        <canvas id="delayChart"></canvas>
-                    </div>
-                </div>
+        </div>
+
+        <div class="glass-panel mt-4 p-4" style="border: 1px solid rgba(255, 193, 7, 0.3); background: rgba(255, 193, 7, 0.02) !important;">
+            <div class="d-flex justify-content-between align-items-center mb-4">
+                <h4 class="text-warning mb-0" style="text-shadow: 0 0 10px rgba(255,193,7,0.3);">
+                    <i data-lucide="bar-chart-2" class="me-2"></i>Pending Invoice Delays
+                </h4>
+                <a href="{% url 'dashboard:global_settings' %}" class="btn btn-sm btn-outline-warning d-flex align-items-center gap-2">
+                    <i data-lucide="settings" style="width: 14px; height: 14px;"></i> Customize Buckets
+                </a>
+            </div>
+            <div style="height: 400px; display: flex; justify-content: center; align-items: center;">
+                <canvas id="delayChart"></canvas>
             </div>
         </div>
     </div>
@@ -258,8 +260,8 @@
     // Delay Bar Chart
     const delayCtx = document.getElementById('delayChart').getContext('2d');
     
-    // Parse the delay_buckets JSON from context safely
-    const delayLabels = ['0-5 Days', '6-15 Days', '16-30 Days', '31-60 Days', '60+ Days'];
+    // Parse the dynamic labels and data safely
+    const delayLabels = JSON.parse('{{ delay_labels_json|escapejs }}');
     const delayData = JSON.parse('{{ delay_buckets_json|escapejs }}');
     
     new Chart(delayCtx, {

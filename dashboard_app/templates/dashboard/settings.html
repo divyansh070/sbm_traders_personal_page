@@ -51,12 +51,26 @@
                         {% endif %}
                     </div>
                 </div>
-                
-                <div class="d-flex justify-content-between align-items-center">
-                    <button type="submit" class="btn btn-primary px-4">Save Settings</button>
+            </div>
+            
+            <div class="glass-panel mt-4">
+                <h3 class="mb-4">Dashboard Features</h3>
+                <div class="mb-4">
+                    <label for="delay_bucket_thresholds" class="form-label text-light">Pending Invoice Delay Buckets (Days)</label>
+                    <input type="text" class="form-control" id="delay_bucket_thresholds" name="delay_bucket_thresholds" value="{{ settings.delay_bucket_thresholds|default:'5, 15, 30, 60' }}" placeholder="e.g., 5, 15, 30, 60">
+                    <div class="form-text text-secondary mt-2">
+                        <strong>Instructions:</strong> Enter a comma-separated list of numbers representing the upper bound in days for each bucket on the Pending Invoice Delays chart.
+                        For example, <code>5, 15, 30, 60</code> will create buckets for 0-5 Days, 6-15 Days, 16-30 Days, 31-60 Days, and 60+ Days.
+                    </div>
                 </div>
-            </form>
-        </div>
+                
+                <div class="d-flex justify-content-end mt-4">
+                    <button type="submit" class="btn btn-primary d-flex align-items-center gap-2" style="background: linear-gradient(135deg, #00f0ff 0%, #0080ff 100%); border: none;">
+                        <i data-lucide="save"></i> Save Settings
+                    </button>
+                </div>
+            </div>
+        </form>
     </div>
     
     <div class="col-md-4">
