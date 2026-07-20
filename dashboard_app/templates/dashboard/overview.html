@@ -337,71 +337,106 @@
         }
     });
 
-    // --- Helper for Percentages in Tooltips ---
-    const tooltipPercentOptions = {
-        callbacks: {
-            label: function(context) {
-                let dataset = context.chart.data.datasets[context.datasetIndex];
-                let total = dataset.data.reduce((acc, val) => acc + val, 0);
-                let value = dataset.data[context.dataIndex];
-                let percentage = total > 0 ? ((value / total) * 100).toFixed(1) : 0;
-                return `${context.label}: ${percentage}% (${value.toLocaleString()})`;
-            }
-        }
-    };
-
-    // Customer Average Delay Chart (Doughnut)
+    // Customer Average Delay Chart (Bar % Axis)
     const customerDelayCtx = document.getElementById('customerDelayChart').getContext('2d');
     const customerLabels = JSON.parse('{{ customer_labels_json|escapejs }}');
-    const customerData = JSON.parse('{{ customer_buckets_json|escapejs }}');
+    const rawCustomerData = JSON.parse('{{ customer_buckets_json|escapejs }}');
+    
+    const totalCustomer = rawCustomerData.reduce((acc, val) => acc + val, 0);
+    const percentCustomerData = rawCustomerData.map(v => totalCustomer > 0 ? ((v / totalCustomer) * 100).toFixed(1) : 0);
     
     new Chart(customerDelayCtx, {
-        type: 'doughnut',
+        type: 'bar',
         data: {
             labels: customerLabels,
             datasets: [{
-                data: customerData,
-                backgroundColor: [
-                    '#00f0ff', '#00b0ff', '#0070ff', '#8a2be2', '#ff0055', '#ff9900'
-                ],
-                borderWidth: 0,
-                hoverOffset: 4
+                label: 'Customers (%)',
+                data: percentCustomerData,
+                backgroundColor: 'rgba(0, 240, 255, 0.8)',
+                borderColor: 'rgba(0, 240, 255, 1)',
+                borderWidth: 1,
+                borderRadius: 4
             }]
         },
         options: {
             responsive: true,
             maintainAspectRatio: false,
             plugins: {
-                tooltip: tooltipPercentOptions,
-                legend: { position: 'right', labels: { color: 'rgba(255, 255, 255, 0.7)' } }
+                legend: { display: false },
+                tooltip: {
+                    callbacks: {
+                        label: function(context) {
+                            return `${context.parsed.y}% (${rawCustomerData[context.dataIndex]} customers)`;
+                        }
+                    }
+                }
+            },
+            scales: {
+                y: {
+                    beginAtZero: true,
+                    max: 100,
+                    ticks: {
+                        color: 'rgba(255, 255, 255, 0.7)',
+                        callback: function(value) { return value + '%'; }
+                    },
+                    grid: { color: 'rgba(255, 255, 255, 0.1)' }
+                },
+                x: {
+                    ticks: { color: 'rgba(255, 255, 255, 0.7)' },
+                    grid: { display: false }
+                }
             }
         }
     });
 
-    // Payment Completion Delay Chart (Doughnut)
+    // Payment Completion Delay Chart (Bar % Axis)
     const paymentDelayCtx = document.getElementById('paymentDelayChart').getContext('2d');
     const paymentLabels = JSON.parse('{{ payment_labels_json|escapejs }}');
-    const paymentData = JSON.parse('{{ payment_buckets_json|escapejs }}');
+    const rawPaymentData = JSON.parse('{{ payment_buckets_json|escapejs }}');
+    
+    const totalPayment = rawPaymentData.reduce((acc, val) => acc + val, 0);
+    const percentPaymentData = rawPaymentData.map(v => totalPayment > 0 ? ((v / totalPayment) * 100).toFixed(1) : 0);
     
     new Chart(paymentDelayCtx, {
-        type: 'doughnut',
+        type: 'bar',
         data: {
             labels: paymentLabels,
             datasets: [{
-                data: paymentData,
-                backgroundColor: [
-                    '#00f0ff', '#00b0ff', '#0070ff', '#8a2be2', '#ff0055', '#ff9900'
-                ],
-                borderWidth: 0,
-                hoverOffset: 4
+                label: 'Payment Volume (%)',
+                data: percentPaymentData,
+                backgroundColor: 'rgba(255, 0, 85, 0.8)',
+                borderColor: 'rgba(255, 0, 85, 1)',
+                borderWidth: 1,
+                borderRadius: 4
             }]
         },
         options: {
             responsive: true,
             maintainAspectRatio: false,
             plugins: {
-                tooltip: tooltipPercentOptions,
-                legend: { position: 'right', labels: { color: 'rgba(255, 255, 255, 0.7)' } }
+                legend: { display: false },
+                tooltip: {
+                    callbacks: {
+                        label: function(context) {
+                            return `${context.parsed.y}% (₹${rawPaymentData[context.dataIndex].toLocaleString()})`;
+                        }
+                    }
+                }
+            },
+            scales: {
+                y: {
+                    beginAtZero: true,
+                    max: 100,
+                    ticks: {
+                        color: 'rgba(255, 255, 255, 0.7)',
+                        callback: function(value) { return value + '%'; }
+                    },
+                    grid: { color: 'rgba(255, 255, 255, 0.1)' }
+                },
+                x: {
+                    ticks: { color: 'rgba(255, 255, 255, 0.7)' },
+                    grid: { display: false }
+                }
             }
         }
     });
