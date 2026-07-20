@@ -87,6 +87,35 @@
                 <canvas id="delayChart"></canvas>
             </div>
         </div>
+
+        <div class="row mt-4">
+            <div class="col-md-6">
+                <div class="glass-panel p-4 h-100">
+                    <div class="d-flex justify-content-between align-items-center mb-4">
+                        <h4 class="mb-0">Customer Avg Delay</h4>
+                        <a href="{% url 'dashboard:global_settings' %}" class="btn btn-sm btn-outline-info">
+                            <i data-lucide="settings" style="width: 14px; height: 14px;"></i>
+                        </a>
+                    </div>
+                    <div style="height: 300px; display: flex; justify-content: center; align-items: center;">
+                        <canvas id="customerDelayChart"></canvas>
+                    </div>
+                </div>
+            </div>
+            <div class="col-md-6">
+                <div class="glass-panel p-4 h-100">
+                    <div class="d-flex justify-content-between align-items-center mb-4">
+                        <h4 class="mb-0">Payment Completion Delay</h4>
+                        <a href="{% url 'dashboard:global_settings' %}" class="btn btn-sm btn-outline-info">
+                            <i data-lucide="settings" style="width: 14px; height: 14px;"></i>
+                        </a>
+                    </div>
+                    <div style="height: 300px; display: flex; justify-content: center; align-items: center;">
+                        <canvas id="paymentDelayChart"></canvas>
+                    </div>
+                </div>
+            </div>
+        </div>
     </div>
     <div class="col-md-4">
         <div class="card p-4 h-100">
@@ -304,6 +333,75 @@
                         display: false
                     }
                 }
+            }
+        }
+    });
+
+    // --- Helper for Percentages in Tooltips ---
+    const tooltipPercentOptions = {
+        callbacks: {
+            label: function(context) {
+                let dataset = context.chart.data.datasets[context.datasetIndex];
+                let total = dataset.data.reduce((acc, val) => acc + val, 0);
+                let value = dataset.data[context.dataIndex];
+                let percentage = total > 0 ? ((value / total) * 100).toFixed(1) : 0;
+                return `${context.label}: ${percentage}% (${value.toLocaleString()})`;
+            }
+        }
+    };
+
+    // Customer Average Delay Chart (Doughnut)
+    const customerDelayCtx = document.getElementById('customerDelayChart').getContext('2d');
+    const customerLabels = JSON.parse('{{ customer_labels_json|escapejs }}');
+    const customerData = JSON.parse('{{ customer_buckets_json|escapejs }}');
+    
+    new Chart(customerDelayCtx, {
+        type: 'doughnut',
+        data: {
+            labels: customerLabels,
+            datasets: [{
+                data: customerData,
+                backgroundColor: [
+                    '#00f0ff', '#00b0ff', '#0070ff', '#8a2be2', '#ff0055', '#ff9900'
+                ],
+                borderWidth: 0,
+                hoverOffset: 4
+            }]
+        },
+        options: {
+            responsive: true,
+            maintainAspectRatio: false,
+            plugins: {
+                tooltip: tooltipPercentOptions,
+                legend: { position: 'right', labels: { color: 'rgba(255, 255, 255, 0.7)' } }
+            }
+        }
+    });
+
+    // Payment Completion Delay Chart (Doughnut)
+    const paymentDelayCtx = document.getElementById('paymentDelayChart').getContext('2d');
+    const paymentLabels = JSON.parse('{{ payment_labels_json|escapejs }}');
+    const paymentData = JSON.parse('{{ payment_buckets_json|escapejs }}');
+    
+    new Chart(paymentDelayCtx, {
+        type: 'doughnut',
+        data: {
+            labels: paymentLabels,
+            datasets: [{
+                data: paymentData,
+                backgroundColor: [
+                    '#00f0ff', '#00b0ff', '#0070ff', '#8a2be2', '#ff0055', '#ff9900'
+                ],
+                borderWidth: 0,
+                hoverOffset: 4
+            }]
+        },
+        options: {
+            responsive: true,
+            maintainAspectRatio: false,
+            plugins: {
+                tooltip: tooltipPercentOptions,
+                legend: { position: 'right', labels: { color: 'rgba(255, 255, 255, 0.7)' } }
             }
         }
     });

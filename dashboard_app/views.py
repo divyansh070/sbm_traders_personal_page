@@ -48,40 +48,73 @@ def dashboard_overview(request):
     avg_delay = Payment.objects.filter(late_only_delay__gt=0).aggregate(Avg('late_only_delay'))['late_only_delay__avg'] or 0
     
     settings = SystemSettings.get_settings()
-    thresholds_str = settings.delay_bucket_thresholds or "5, 15, 30, 60"
     
-    # Parse thresholds safely
-    try:
-        thresholds = [int(t.strip()) for t in thresholds_str.split(',') if t.strip().isdigit()]
-        thresholds = sorted(list(set(thresholds)))
-        if not thresholds:
-            thresholds = [5, 15, 30, 60]
-    except Exception:
-        thresholds = [5, 15, 30, 60]
-        
-    # Generate labels dynamically based on thresholds
-    delay_labels = []
-    prev = 0
-    for t in thresholds:
-        if prev == 0:
-            delay_labels.append(f"0-{t} Days")
-        else:
-            delay_labels.append(f"{prev + 1}-{t} Days")
-        prev = t
-    delay_labels.append(f"{prev + 1}+ Days")
+    def parse_thresholds(thresh_str):
+        try:
+            th = [int(t.strip()) for t in (thresh_str or "5, 15, 30, 60").split(',') if t.strip().isdigit()]
+            th = sorted(list(set(th)))
+            if not th: return [5, 15, 30, 60]
+            return th
+        except Exception:
+            return [5, 15, 30, 60]
+            
+    def generate_labels(th):
+        labels = []
+        prev = 0
+        for t in th:
+            labels.append(f"0-{t} Days" if prev == 0 else f"{prev + 1}-{t} Days")
+            prev = t
+        labels.append(f"{prev + 1}+ Days")
+        return labels
+
+    pending_th = parse_thresholds(settings.delay_bucket_thresholds)
+    pending_labels = generate_labels(pending_th)
+    delay_buckets = {label: 0 for label in pending_labels}
     
-    delay_buckets = {label: 0 for label in delay_labels}
+    customer_th = parse_thresholds(settings.customer_delay_thresholds)
+    customer_labels = generate_labels(customer_th)
+    customer_buckets = {label: 0 for label in customer_labels}
     
+    payment_th = parse_thresholds(settings.payment_delay_thresholds)
+    payment_labels = generate_labels(payment_th)
+    payment_buckets = {label: 0 for label in payment_labels}
+    
+    # 1. Pending Invoices (Count)
     for p in Payment.objects.filter(payment_status='Pending'):
         delay = p.delay
         placed = False
-        for i, t in enumerate(thresholds):
+        for i, t in enumerate(pending_th):
             if delay <= t:
-                delay_buckets[delay_labels[i]] += 1
+                delay_buckets[pending_labels[i]] += 1
                 placed = True
                 break
         if not placed:
-            delay_buckets[delay_labels[-1]] += 1
+            delay_buckets[pending_labels[-1]] += 1
+            
+    # 2. Payment Completion (Volume)
+    for p in Payment.objects.exclude(payment_status='Pending').filter(amount__gt=0):
+        delay = p.late_only_delay
+        placed = False
+        for i, t in enumerate(payment_th):
+            if delay <= t:
+                payment_buckets[payment_labels[i]] += float(p.amount)
+                placed = True
+                break
+        if not placed:
+            payment_buckets[payment_labels[-1]] += float(p.amount)
+            
+    # 3. Customer Average Delay (Count)
+    customer_avg_delays = Payment.objects.exclude(payment_status='Pending').values('customer_id').annotate(avg_delay=Avg('late_only_delay'))
+    for c in customer_avg_delays:
+        avg_d = c['avg_delay'] or 0
+        placed = False
+        for i, t in enumerate(customer_th):
+            if avg_d <= t:
+                customer_buckets[customer_labels[i]] += 1
+                placed = True
+                break
+        if not placed:
+            customer_buckets[customer_labels[-1]] += 1
     
     context = {
         'total_amount': total_ordered_amount,
@@ -90,8 +123,15 @@ def dashboard_overview(request):
         'total_debt_value': net_outstanding,
         'avg_delay': avg_delay,
         'top_customers': top_customers,
+        
         'delay_buckets_json': json.dumps(list(delay_buckets.values())),
-        'delay_labels_json': json.dumps(delay_labels),
+        'delay_labels_json': json.dumps(pending_labels),
+        
+        'customer_buckets_json': json.dumps(list(customer_buckets.values())),
+        'customer_labels_json': json.dumps(customer_labels),
+        
+        'payment_buckets_json': json.dumps(list(payment_buckets.values())),
+        'payment_labels_json': json.dumps(payment_labels),
     }
     return render(request, 'dashboard/overview.html', context)
 
@@ -339,12 +379,18 @@ def global_settings(request):
         google_sheet_url = request.POST.get('google_sheet_url', '').strip()
         invoice_google_sheet_url = request.POST.get('invoice_google_sheet_url', '').strip()
         delay_bucket_thresholds = request.POST.get('delay_bucket_thresholds', '').strip()
+        customer_delay_thresholds = request.POST.get('customer_delay_thresholds', '').strip()
+        payment_delay_thresholds = request.POST.get('payment_delay_thresholds', '').strip()
         
         settings.google_sheet_url = google_sheet_url
         settings.invoice_google_sheet_url = invoice_google_sheet_url
         
         if delay_bucket_thresholds:
             settings.delay_bucket_thresholds = delay_bucket_thresholds
+        if customer_delay_thresholds:
+            settings.customer_delay_thresholds = customer_delay_thresholds
+        if payment_delay_thresholds:
+            settings.payment_delay_thresholds = payment_delay_thresholds
             
         settings.save()
         

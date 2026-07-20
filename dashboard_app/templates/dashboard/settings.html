@@ -60,7 +60,22 @@
                     <input type="text" class="form-control" id="delay_bucket_thresholds" name="delay_bucket_thresholds" value="{{ settings.delay_bucket_thresholds|default:'5, 15, 30, 60' }}" placeholder="e.g., 5, 15, 30, 60">
                     <div class="form-text text-secondary mt-2">
                         <strong>Instructions:</strong> Enter a comma-separated list of numbers representing the upper bound in days for each bucket on the Pending Invoice Delays chart.
-                        For example, <code>5, 15, 30, 60</code> will create buckets for 0-5 Days, 6-15 Days, 16-30 Days, 31-60 Days, and 60+ Days.
+                    </div>
+                </div>
+
+                <div class="mb-4">
+                    <label for="customer_delay_thresholds" class="form-label text-light">Customer Average Delay Buckets (Days)</label>
+                    <input type="text" class="form-control" id="customer_delay_thresholds" name="customer_delay_thresholds" value="{{ settings.customer_delay_thresholds|default:'5, 15, 30, 60' }}" placeholder="e.g., 5, 15, 30, 60">
+                    <div class="form-text text-secondary mt-2">
+                        <strong>Instructions:</strong> Enter a comma-separated list of days for the Customer Average Delay chart.
+                    </div>
+                </div>
+
+                <div class="mb-4">
+                    <label for="payment_delay_thresholds" class="form-label text-light">Payment Completion Delay Buckets (Days)</label>
+                    <input type="text" class="form-control" id="payment_delay_thresholds" name="payment_delay_thresholds" value="{{ settings.payment_delay_thresholds|default:'5, 15, 30, 60' }}" placeholder="e.g., 5, 15, 30, 60">
+                    <div class="form-text text-secondary mt-2">
+                        <strong>Instructions:</strong> Enter a comma-separated list of days for the Payment Completion Delay chart.
                     </div>
                 </div>
                 
