@@ -5,6 +5,7 @@ from django.core.management import call_command
 from .models import Customer, Payment, SystemSettings
 from django.utils import timezone
 from django.db import connection
+import json
 
 def dashboard_overview(request):
     with connection.cursor() as cursor:
@@ -46,6 +47,25 @@ def dashboard_overview(request):
     
     avg_delay = Payment.objects.filter(late_only_delay__gt=0).aggregate(Avg('late_only_delay'))['late_only_delay__avg'] or 0
     
+    delay_buckets = {
+        '0-5 Days': 0,
+        '6-15 Days': 0,
+        '16-30 Days': 0,
+        '31-60 Days': 0,
+        '60+ Days': 0,
+    }
+    for p in Payment.objects.filter(payment_status='Pending'):
+        if p.delay <= 5:
+            delay_buckets['0-5 Days'] += 1
+        elif p.delay <= 15:
+            delay_buckets['6-15 Days'] += 1
+        elif p.delay <= 30:
+            delay_buckets['16-30 Days'] += 1
+        elif p.delay <= 60:
+            delay_buckets['31-60 Days'] += 1
+        else:
+            delay_buckets['60+ Days'] += 1
+    
     context = {
         'total_amount': total_ordered_amount,
         'total_unused': net_outstanding, # Renamed internally to mean net outstanding debt
@@ -53,6 +73,7 @@ def dashboard_overview(request):
         'total_debt_value': net_outstanding,
         'avg_delay': avg_delay,
         'top_customers': top_customers,
+        'delay_buckets_json': json.dumps(list(delay_buckets.values())),
     }
     return render(request, 'dashboard/overview.html', context)
 
