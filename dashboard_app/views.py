@@ -80,8 +80,7 @@ def dashboard_overview(request):
     payment_buckets = {label: 0 for label in payment_labels}
     
     # 1. Pending Invoices (Count)
-    for p in Payment.objects.filter(payment_status='Pending'):
-        delay = p.delay
+    for delay in Payment.objects.filter(payment_status='Pending').values_list('delay', flat=True):
         placed = False
         for i, t in enumerate(pending_th):
             if delay <= t:
@@ -92,16 +91,15 @@ def dashboard_overview(request):
             delay_buckets[pending_labels[-1]] += 1
             
     # 2. Payment Completion (Volume)
-    for p in Payment.objects.exclude(payment_status='Pending').filter(amount__gt=0):
-        delay = p.late_only_delay
+    for delay, amount in Payment.objects.exclude(payment_status='Pending').filter(amount__gt=0).values_list('late_only_delay', 'amount'):
         placed = False
         for i, t in enumerate(payment_th):
             if delay <= t:
-                payment_buckets[payment_labels[i]] += float(p.amount)
+                payment_buckets[payment_labels[i]] += float(amount or 0)
                 placed = True
                 break
         if not placed:
-            payment_buckets[payment_labels[-1]] += float(p.amount)
+            payment_buckets[payment_labels[-1]] += float(amount or 0)
             
     # 3. Customer Average Delay (Count)
     customer_avg_delays = Payment.objects.exclude(payment_status='Pending').values('customer_id').annotate(avg_delay=Avg('late_only_delay'))
